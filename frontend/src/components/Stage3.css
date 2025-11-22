@@ -1,0 +1,25 @@
+.stage3 {
+  background: #f0fff0;
+  border-color: #c8e6c8;
+}
+
+.final-response {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #c8e6c8;
+}
+
+.chairman-label {
+  color: #2d8a2d;
+  font-size: 12px;
+  font-family: monospace;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.final-text {
+  color: #333;
+  line-height: 1.7;
+  font-size: 15px;
+}
