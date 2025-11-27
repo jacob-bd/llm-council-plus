@@ -336,7 +336,9 @@ async def run_full_council(user_query: str, use_web_search: bool = False) -> Tup
     if use_web_search:
         # We use the user query directly for search.
         # In a more advanced version, we might generate a specific search query.
-        search_context = perform_web_search(user_query)
+        # Run in thread to avoid blocking the event loop
+        import asyncio
+        search_context = await asyncio.to_thread(perform_web_search, user_query)
 
     # Stage 1: Collect individual responses
     stage1_results = await stage1_collect_responses(user_query, search_context)

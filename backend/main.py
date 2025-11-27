@@ -155,7 +155,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             search_context = ""
             if request.web_search:
                 yield f"data: {json.dumps({'type': 'search_start'})}\n\n"
-                search_context = perform_web_search(request.content)
+                # Run in thread to avoid blocking
+                search_context = await asyncio.to_thread(perform_web_search, request.content)
                 yield f"data: {json.dumps({'type': 'search_complete', 'data': search_context})}\n\n"
 
             # Stage 1: Collect responses

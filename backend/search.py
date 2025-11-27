@@ -37,5 +37,5 @@ def perform_web_search(query: str, max_results: int = 5) -> str:
         
     except Exception as e:
         logger.error(f"Error performing web search: {str(e)}")
-        # Graceful degradation: return empty string or error message that doesn't break the flow
-        return ""
+        # Graceful degradation: return explicit message so models know search failed
+        return "[System Note: Web search was attempted but failed. Please answer based on your internal knowledge.]"
