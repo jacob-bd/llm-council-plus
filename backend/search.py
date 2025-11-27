@@ -20,8 +20,8 @@ def perform_web_search(query: str, max_results: int = 5) -> str:
     try:
         results = []
         with DDGS() as ddgs:
-            # Use text search
-            search_results = list(ddgs.text(query, max_results=max_results))
+            # Use text search with 'us-en' region for better relevance
+            search_results = list(ddgs.text(query, region='us-en', max_results=max_results))
             
             for i, result in enumerate(search_results, 1):
                 title = result.get('title', 'No Title')

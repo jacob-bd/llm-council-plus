@@ -18,8 +18,10 @@ async def stage1_collect_responses(user_query: str, search_context: str = "") ->
         List of dicts with 'model' and 'response' keys
     """
     if search_context:
-        prompt = f"""Use the following search results to answer the question.
-        
+        prompt = f"""You have access to the following real-time web search results.
+You MUST use this information to answer the question, even if it contradicts your internal knowledge cutoff.
+Do not say "I cannot access real-time information" or "My knowledge is limited to..." because you have the search results right here.
+
 Search Results:
 {search_context}
 
