@@ -185,6 +185,41 @@
   color: #ef4444;
 }
 
+.delete-confirm {
+  display: flex;
+  gap: 4px;
+}
+
+.confirm-yes-btn,
+.confirm-no-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.confirm-yes-btn {
+  color: #10b981;
+}
+
+.confirm-yes-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.confirm-no-btn {
+  color: #ef4444;
+}
+
+.confirm-no-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
 .stop-generation-btn.small {
   padding: 2px 8px;
   font-size: 10px;

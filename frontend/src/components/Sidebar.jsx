@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './Sidebar.css';
 
 export default function Sidebar({
@@ -11,10 +11,27 @@ export default function Sidebar({
   isLoading,
   onAbort
 }) {
-  
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
+
   const handleAbortClick = (e) => {
     e.stopPropagation();
     onAbort();
+  };
+
+  const handleDeleteClick = (e, convId) => {
+    e.stopPropagation();
+    setConfirmingDelete(convId);
+  };
+
+  const handleConfirmDelete = (e, convId) => {
+    e.stopPropagation();
+    onDeleteConversation(convId);
+    setConfirmingDelete(null);
+  };
+
+  const handleCancelDelete = (e) => {
+    e.stopPropagation();
+    setConfirmingDelete(null);
   };
 
   return (
@@ -71,13 +88,27 @@ export default function Sidebar({
                   <button className="stop-generation-btn small" onClick={handleAbortClick}>
                     Stop
                   </button>
+                ) : confirmingDelete === conv.id ? (
+                  <div className="delete-confirm">
+                    <button
+                      className="confirm-yes-btn"
+                      onClick={(e) => handleConfirmDelete(e, conv.id)}
+                      title="Confirm delete"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      className="confirm-no-btn"
+                      onClick={handleCancelDelete}
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ) : (
                   <button
                     className="delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteConversation(conv.id);
-                    }}
+                    onClick={(e) => handleDeleteClick(e, conv.id)}
                     title="Delete conversation"
                   >
                     🗑️
