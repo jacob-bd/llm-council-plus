@@ -309,33 +309,36 @@
   height: 36px;
   border-radius: 50%;
   cursor: pointer;
-  color: #f43f5e; /* Rose-500 OFF */
   transition: all 0.2s;
-  background: rgba(244, 63, 94, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   margin-bottom: 6px;
   position: relative;
-  border: 1px solid rgba(244, 63, 94, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  opacity: 0.6;
 }
 
 .search-toggle:hover {
-  background: rgba(244, 63, 94, 0.2);
-  color: #fb7185;
+  background: rgba(239, 68, 68, 0.25);
+  opacity: 0.8;
 }
 
 .search-toggle.active {
   background: rgba(6, 182, 212, 0.2);
-  color: var(--accent-stage1);
-  border-color: rgba(6, 182, 212, 0.3);
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
-}
-
-.search-toggle.active .search-icon {
-  filter: grayscale(0%);
-  color: var(--accent-stage1);
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+  opacity: 1;
 }
 
 .search-icon {
   font-size: 18px;
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.search-toggle.active .search-icon {
+  filter: grayscale(0%);
+  opacity: 1;
 }
 
 /* Tooltip */
