@@ -190,35 +190,35 @@ export default function CouncilGrid({
                 );
             })}
 
-            {/* Chairman Card - Only show when not actively thinking (Stage 1/2) */}
-            {status !== 'thinking' && (
-                <div
-                    className="council-card chairman ready"
-                    style={{ '--provider-color': chairman ? getProviderInfo(chairman).color : '#fbbf24' }}
-                    onMouseEnter={(e) => handleMouseEnter(e, chairman || 'Chairman')}
-                    onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
-                >
-                    <div className="role-badge chairman">Chairman</div>
-                    <div className="council-avatar">
-                        {chairmanInfo && chairmanInfo.logo ? (
-                            <img
-                                src={chairmanInfo.logo}
-                                alt={chairmanInfo.label}
-                                className="provider-logo"
-                            />
-                        ) : (
-                            <span className="avatar-icon">{chairmanInfo ? chairmanInfo.icon : '⚖️'}</span>
-                        )}
-                    </div>
-                    <div className="council-info">
-                        <span className="model-name">
-                            {chairman ? getModelDisplayName(chairman) : 'Model'}
-                        </span>
-                        <span className="provider-label">Final Verdict</span>
-                    </div>
+            {/* Chairman Card - Always show, but state changes */}
+            <div
+                className={`council-card chairman ${status === 'thinking' ? 'waiting' : 'ready'}`}
+                style={{ '--provider-color': (status !== 'thinking' && chairman) ? getProviderInfo(chairman).color : '#94a3b8' }}
+                onMouseEnter={(e) => status !== 'thinking' && handleMouseEnter(e, chairman || 'Chairman')}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+            >
+                <div className="role-badge chairman">Chairman</div>
+                <div className="council-avatar">
+                    {status !== 'thinking' && chairmanInfo && chairmanInfo.logo ? (
+                        <img
+                            src={chairmanInfo.logo}
+                            alt={chairmanInfo.label}
+                            className="provider-logo"
+                        />
+                    ) : (
+                        <span className="avatar-icon">{status === 'thinking' ? '⏳' : (chairmanInfo ? chairmanInfo.icon : '⚖️')}</span>
+                    )}
                 </div>
-            )}
+                <div className="council-info">
+                    <span className="model-name">
+                        {status === 'thinking' ? 'Verdict Pending' : (chairman ? getModelDisplayName(chairman) : 'Model')}
+                    </span>
+                    <span className="provider-label">
+                        {status === 'thinking' ? 'Waiting...' : 'Final Verdict'}
+                    </span>
+                </div>
+            </div>
         </div>
     );
 }

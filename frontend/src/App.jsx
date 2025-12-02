@@ -20,6 +20,7 @@ function App() {
   const [councilConfigured, setCouncilConfigured] = useState(true); // Assume configured until checked
   const [councilModels, setCouncilModels] = useState([]);
   const [chairmanModel, setChairmanModel] = useState(null);
+  const [searchProvider, setSearchProvider] = useState('duckduckgo');
   const [executionMode, setExecutionMode] = useState('full');
   const abortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -37,6 +38,7 @@ function App() {
 
       // Load execution mode preference
       setExecutionMode(settings.execution_mode || 'full');
+      setSearchProvider(settings.search_provider || 'duckduckgo');
 
       const hasApiKey = settings.openrouter_api_key_set ||
         settings.groq_api_key_set ||
@@ -101,6 +103,7 @@ function App() {
 
       setCouncilModels(models);
       setChairmanModel(chairman);
+      setSearchProvider(settings.search_provider || 'duckduckgo');
 
       const hasCouncilMembers = models.some(m => m && m.trim() !== '');
       const hasChairman = chairman && chairman.trim() !== '';
@@ -198,6 +201,15 @@ function App() {
   };
 
   const handleNewConversation = async () => {
+    // Check if there's already an empty/unused conversation
+    const existingEmpty = conversations.find(conv => !conv.title && conv.message_count === 0);
+
+    if (existingEmpty) {
+      // Reuse the existing empty conversation instead of creating a new one
+      setCurrentConversationId(existingEmpty.id);
+      return;
+    }
+
     try {
       const newConv = await api.createConversation();
       setConversations([
@@ -668,6 +680,7 @@ function App() {
         councilConfigured={councilConfigured}
         councilModels={councilModels}
         chairmanModel={chairmanModel}
+        searchProvider={searchProvider}
         onOpenSettings={handleOpenSettings}
         executionMode={executionMode}
         onExecutionModeChange={setExecutionMode}

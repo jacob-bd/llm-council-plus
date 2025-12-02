@@ -21,6 +21,7 @@ export default function ChatInterface({
     chairmanModel = null,
     executionMode,
     onExecutionModeChange,
+    searchProvider = 'duckduckgo',
 }) {
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
@@ -115,7 +116,14 @@ export default function ChatInterface({
                                         {msg.loading?.search && (
                                             <div className="stage-loading">
                                                 <div className="spinner"></div>
-                                                <span>Searching the web...</span>
+                                                <span>
+                                                    🔍 Searching the web with {
+                                                        searchProvider === 'duckduckgo' ? 'DuckDuckGo' :
+                                                            searchProvider === 'tavily' ? 'Tavily' :
+                                                                searchProvider === 'brave' ? 'Brave' :
+                                                                    'Provider'
+                                                    }...
+                                                </span>
                                             </div>
                                         )}
 
