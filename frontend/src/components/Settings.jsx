@@ -1646,7 +1646,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                         className="model-select"
                       >
                         <option value="">Select a model</option>
-                        {renderModelOptions(filterByRemoteLocal(getChairmanModels(), chairmanFilter))}
+                        {renderModelOptions(filterByRemoteLocal(getFilteredAvailableModels(), chairmanFilter))}
                       </select>
                     </div>
                   </div>

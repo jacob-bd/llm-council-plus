@@ -53,10 +53,13 @@ const getModelDisplayName = (modelId) => {
     // Remove "ollama:" prefix if present
     name = name.replace(/^ollama:/, '');
 
-    // Remove colon-based prefixes (e.g., "anthropic:claude...", "ollama:llama3")
+    // Remove colon-based prefixes (e.g., "anthropic:claude...", "ollama:llama3", "openrouter:...")
     if (name.includes(':')) {
         name = name.split(':').pop();
     }
+
+    // Remove :free suffix if present (from OpenRouter free models)
+    name = name.replace(/:free$/, '');
 
     return name;
 };
