@@ -321,6 +321,11 @@ class UpdateSettingsRequest(BaseModel):
     # Council Configuration (unified)
     council_models: Optional[List[str]] = None
     chairman_model: Optional[str] = None
+    
+    # Remote/Local filters
+    council_member_filters: Optional[Dict[int, str]] = None
+    chairman_filter: Optional[str] = None
+    search_query_filter: Optional[str] = None
 
     # Web Search Query Generator
     search_query_model: Optional[str] = None
@@ -368,6 +373,11 @@ async def get_app_settings():
         # Council Configuration (unified)
         "council_models": settings.council_models,
         "chairman_model": settings.chairman_model,
+        
+        # Remote/Local filters
+        "council_member_filters": settings.council_member_filters,
+        "chairman_filter": settings.chairman_filter,
+        "search_query_filter": settings.search_query_filter,
 
         # Web Search Query Generator
         "search_query_model": settings.search_query_model,
@@ -495,6 +505,14 @@ async def update_app_settings(request: UpdateSettingsRequest):
 
     if request.chairman_model is not None:
         updates["chairman_model"] = request.chairman_model
+        
+    # Remote/Local filters
+    if request.council_member_filters is not None:
+        updates["council_member_filters"] = request.council_member_filters
+    if request.chairman_filter is not None:
+        updates["chairman_filter"] = request.chairman_filter
+    if request.search_query_filter is not None:
+        updates["search_query_filter"] = request.search_query_filter
 
     # Web Search Query Generator
     if request.search_query_model is not None:
@@ -529,6 +547,7 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "google_api_key_set": bool(settings.google_api_key),
         "mistral_api_key_set": bool(settings.mistral_api_key),
         "deepseek_api_key_set": bool(settings.deepseek_api_key),
+        "groq_api_key_set": bool(settings.groq_api_key),
 
         # Enabled Providers
         "enabled_providers": settings.enabled_providers,
@@ -537,6 +556,11 @@ async def update_app_settings(request: UpdateSettingsRequest):
         # Council Configuration (unified)
         "council_models": settings.council_models,
         "chairman_model": settings.chairman_model,
+        
+        # Remote/Local filters
+        "council_member_filters": settings.council_member_filters,
+        "chairman_filter": settings.chairman_filter,
+        "search_query_filter": settings.search_query_filter,
 
         # Web Search Query Generator
         "search_query_model": settings.search_query_model,

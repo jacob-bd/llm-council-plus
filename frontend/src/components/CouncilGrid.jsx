@@ -110,12 +110,20 @@ export default function CouncilGrid({
     const memberCount = displayModels.length;
     let gridClass = 'council-grid';
 
-    if (memberCount <= 3) {
-        gridClass += ' grid-single-row'; // 1 row layout
-    } else if (memberCount <= 6) {
-        gridClass += ' grid-3-cols'; // 3 members per row (max 2 rows)
+    if (memberCount <= 2) {
+        gridClass += ' layout-2-members';
+    } else if (memberCount === 3) {
+        gridClass += ' layout-3-members';
+    } else if (memberCount === 4) {
+        gridClass += ' layout-4-members';
+    } else if (memberCount === 5) {
+        gridClass += ' layout-5-members';
+    } else if (memberCount === 6) {
+        gridClass += ' layout-6-members';
+    } else if (memberCount === 7) {
+        gridClass += ' layout-7-members';
     } else {
-        gridClass += ' grid-4-cols'; // 4 members per row (max 2 rows)
+        gridClass += ' layout-8-members'; // 8 or more
     }
 
     return (

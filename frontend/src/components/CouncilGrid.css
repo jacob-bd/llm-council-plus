@@ -2,41 +2,64 @@
     display: grid;
     gap: 12px;
     width: 100%;
-    max-width: 900px;
+    max-width: 1100px;
     margin: 20px auto;
     padding: 10px;
 }
 
-/* Single row layout (2-3 members) */
-.council-grid.grid-single-row {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+/* 2 Members (3 items total) - Single Row */
+.council-grid.layout-2-members {
+    grid-template-columns: repeat(3, 1fr);
 }
 
-.council-grid.grid-single-row .council-card.chairman {
-    grid-column: auto;
-    grid-row: auto;
+/* 3 Members (4 items total) - Single Row */
+.council-grid.layout-3-members {
+    grid-template-columns: repeat(4, 1fr);
 }
 
-/* 3-column layout (4-6 members) */
-.council-grid.grid-3-cols {
+/* 4 Members (5 items total) - Single Row */
+.council-grid.layout-4-members {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+/* 5 Members (6 items total) - 3 Top, 2 Bottom + Chairman */
+.council-grid.layout-5-members {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.council-grid.layout-5-members .council-card.chairman {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+/* 6 Members (7 items total) - 3 Top, 3 Bottom, Chairman Side */
+.council-grid.layout-6-members {
     grid-template-columns: repeat(3, 1fr) 1fr;
-    grid-auto-rows: 1fr;
 }
 
-.council-grid.grid-3-cols .council-card.chairman {
+.council-grid.layout-6-members .council-card.chairman {
     grid-column: 4;
     grid-row: 1 / 3;
     align-self: center;
     max-height: 200px;
 }
 
-/* 4-column layout (7-8 members) */
-.council-grid.grid-4-cols {
-    grid-template-columns: repeat(4, 1fr) 1fr;
-    grid-auto-rows: 1fr;
+/* 7 Members (8 items total) - 4 Top, 3 Bottom + Chairman */
+.council-grid.layout-7-members {
+    grid-template-columns: repeat(4, 1fr);
 }
 
-.council-grid.grid-4-cols .council-card.chairman {
+.council-grid.layout-7-members .council-card.chairman {
+    grid-column: 4;
+    grid-row: 2;
+}
+
+/* 8 Members (9 items total) - 4 Top, 4 Bottom, Chairman Side */
+.council-grid.layout-8-members {
+    grid-template-columns: repeat(4, 1fr) 1fr;
+}
+
+.council-grid.layout-8-members .council-card.chairman {
     grid-column: 5;
     grid-row: 1 / 3;
     align-self: center;
@@ -46,12 +69,12 @@
 /* Mobile: stack vertically */
 @media (max-width: 799px) {
     .council-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
     }
 
     .council-card.chairman {
-        grid-column: auto;
-        grid-row: auto;
+        grid-column: auto !important;
+        grid-row: auto !important;
     }
 }
 

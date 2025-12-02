@@ -186,19 +186,18 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     prompts
   ]);
 
-  // Auto-switch filters if provider availability changes
+  // Helper to determine if filters need to switch based on availability
+  const isRemoteAvailable = enabledProviders.openrouter || enabledProviders.direct || enabledProviders.groq;
+  const isLocalAvailable = enabledProviders.ollama;
+
+  const getNewFilter = (currentFilter) => {
+    if (currentFilter === 'remote' && !isRemoteAvailable && isLocalAvailable) return 'local';
+    if (currentFilter === 'local' && !isLocalAvailable && isRemoteAvailable) return 'remote';
+    return currentFilter;
+  };
+
+  // Effect 1: Auto-update Council Member filters when providers change or members are added
   useEffect(() => {
-    const isRemoteAvailable = enabledProviders.openrouter || enabledProviders.direct || enabledProviders.groq;
-    const isLocalAvailable = enabledProviders.ollama;
-
-    // Helper to switch filter if needed
-    const getNewFilter = (currentFilter) => {
-      if (currentFilter === 'remote' && !isRemoteAvailable && isLocalAvailable) return 'local';
-      if (currentFilter === 'local' && !isLocalAvailable && isRemoteAvailable) return 'remote';
-      return currentFilter;
-    };
-
-    // Update Council Members - iterate over ALL members, not just existing filter keys
     setCouncilMemberFilters(prev => {
       const next = { ...prev };
       let changed = false;
@@ -215,7 +214,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       }
       return changed ? next : prev;
     });
+  }, [enabledProviders, councilModels.length]);
 
+  // Effect 2: Auto-update Chairman and Search filters when providers change
+  // Note: We intentionally exclude councilModels.length to prevent resetting these when adding members
+  useEffect(() => {
     // Update Chairman
     const newChairmanFilter = getNewFilter(chairmanFilter);
     if (newChairmanFilter !== chairmanFilter) {
@@ -229,12 +232,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setSearchQueryFilter(newSearchFilter);
       setSearchQueryModel('');
     }
-
-  }, [enabledProviders, chairmanFilter, searchQueryFilter, councilModels.length]); // councilMemberFilters dependency omitted to avoid loops, handled via functional update
+  }, [enabledProviders, chairmanFilter, searchQueryFilter]);
 
   const loadSettings = async () => {
     try {
       const data = await api.getSettings();
+
+      // Set settings immediately to show UI
       setSettings(data);
 
       setSelectedSearchProvider(data.search_provider || 'duckduckgo');
@@ -310,11 +314,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       });
       setGroqApiKey(''); // Clear Groq key too
 
-      // Load available models from all sources
+      // Load available models in background
       loadModels();
       loadOllamaModels(data.ollama_base_url || 'http://localhost:11434');
 
     } catch (err) {
+      console.error("Error loading settings:", err);
       setError('Failed to load settings');
     }
   };
@@ -682,16 +687,30 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
   const handleAddCouncilMember = () => {
     const newIndex = councilModels.length;
-    const filter = getMemberFilter(newIndex);
-    const filtered = filterByRemoteLocal(getFilteredAvailableModels(), filter);
-    if (filtered.length > 0) {
-      setCouncilModels(prev => [...prev, filtered[0].id]);
-      // Initialize filter for new member
-      setCouncilMemberFilters(prev => ({
-        ...prev,
-        [newIndex]: 'remote'
-      }));
+
+    // Determine best default filter based on what's available
+    let defaultFilter = 'remote';
+    const isRemoteAvailable = enabledProviders.openrouter || enabledProviders.direct || enabledProviders.groq;
+    const isLocalAvailable = enabledProviders.ollama && ollamaAvailableModels.length > 0;
+
+    if (!isRemoteAvailable && isLocalAvailable) {
+      defaultFilter = 'local';
     }
+
+    // Get models for the chosen filter
+    const filtered = filterByRemoteLocal(getFilteredAvailableModels(), defaultFilter);
+
+    // Even if no models found, we should allow adding the slot so user can switch filter/provider
+    // But we try to pick a default if possible
+    const defaultModel = filtered.length > 0 ? filtered[0].id : '';
+
+    setCouncilModels(prev => [...prev, defaultModel]);
+
+    // Initialize filter for new member
+    setCouncilMemberFilters(prev => ({
+      ...prev,
+      [newIndex]: defaultFilter
+    }));
   };
 
   const handleRemoveCouncilMember = (index) => {
@@ -1559,13 +1578,14 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                               value={modelId}
                               onChange={e => handleCouncilModelChange(index, e.target.value)}
                               className="model-select"
+                              disabled={isLoadingModels && availableModels.length === 0}
                             >
-                              <option value="">Select a model</option>
+                              <option value="">{isLoadingModels && availableModels.length === 0 ? "Loading models..." : "Select a model"}</option>
                               {renderModelOptions(filterByRemoteLocal(getFilteredAvailableModels(), memberFilter))}
                               {/* Keep current selection visible even if filtered out */}
-                              {!filterByRemoteLocal(getFilteredAvailableModels(), memberFilter).find(m => m.id === modelId) && (
+                              {!filterByRemoteLocal(getFilteredAvailableModels(), memberFilter).find(m => m.id === modelId) && modelId && (
                                 <option value={modelId}>
-                                  {getAllAvailableModels().find(m => m.id === modelId)?.name || modelId}
+                                  {isLoadingModels ? "Loading model info..." : (getAllAvailableModels().find(m => m.id === modelId)?.name || modelId)}
                                 </option>
                               )}
                             </select>

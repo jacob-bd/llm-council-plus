@@ -104,6 +104,11 @@ class Settings(BaseModel):
     # Council Configuration (unified across all providers)
     council_models: List[str] = DEFAULT_COUNCIL_MODELS.copy()
     chairman_model: str = DEFAULT_CHAIRMAN_MODEL
+    
+    # Remote/Local filters
+    council_member_filters: Optional[Dict[int, str]] = None
+    chairman_filter: Optional[str] = None
+    search_query_filter: Optional[str] = None
 
     # Web Search Query Generator
     search_query_model: str = DEFAULT_SEARCH_QUERY_MODEL
