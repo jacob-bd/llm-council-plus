@@ -952,15 +952,26 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     const config = {
       // General
       search_provider: selectedSearchProvider,
+      search_keyword_extraction: searchKeywordExtraction,
       full_content_results: fullContentResults,
       show_free_only: showFreeOnly,
 
       // Enabled Providers
       enabled_providers: enabledProviders,
+      direct_provider_toggles: directProviderToggles,
 
       // Council Configuration (unified)
       council_models: councilModels,
       chairman_model: chairmanModel,
+
+      // Temperature Settings
+      council_temperature: councilTemperature,
+      chairman_temperature: chairmanTemperature,
+      stage2_temperature: stage2Temperature,
+
+      // Filters
+      council_member_filters: councilMemberFilters,
+      chairman_filter: chairmanFilter,
 
       // Ollama Base URL
       ollama_base_url: ollamaBaseUrl,
@@ -989,6 +1000,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
         // Apply General Settings
         if (config.search_provider) setSelectedSearchProvider(config.search_provider);
+        if (config.search_keyword_extraction) setSearchKeywordExtraction(config.search_keyword_extraction);
         if (config.full_content_results !== undefined) setFullContentResults(config.full_content_results);
         if (config.show_free_only !== undefined) setShowFreeOnly(config.show_free_only);
 
@@ -996,15 +1008,26 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         if (config.enabled_providers) {
           setEnabledProviders(config.enabled_providers);
         }
+        if (config.direct_provider_toggles) {
+          setDirectProviderToggles(config.direct_provider_toggles);
+        }
 
         // Apply Council Configuration (unified)
         if (config.council_models) setCouncilModels(config.council_models);
         if (config.chairman_model) setChairmanModel(config.chairman_model);
 
+        // Apply Temperature Settings
+        if (config.council_temperature !== undefined) setCouncilTemperature(config.council_temperature);
+        if (config.chairman_temperature !== undefined) setChairmanTemperature(config.chairman_temperature);
+        if (config.stage2_temperature !== undefined) setStage2Temperature(config.stage2_temperature);
+
+        // Apply Filters
+        if (config.council_member_filters) setCouncilMemberFilters(config.council_member_filters);
+        if (config.chairman_filter) setChairmanFilter(config.chairman_filter);
+
         // Apply Ollama Base URL
         if (config.ollama_base_url) setOllamaBaseUrl(config.ollama_base_url);
 
-        // Apply Web Search Query Generator
         // Apply Prompts
         if (config.prompts) {
           setPrompts(prev => ({ ...prev, ...config.prompts }));
