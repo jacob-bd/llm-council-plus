@@ -20,6 +20,7 @@ Instead of asking a single LLM (like ChatGPT or Claude) for an answer, **LLM Cou
 3. **Synthesize a final answer** through a Chairman model (Stage 3)
 
 The result? More balanced, accurate, and thoroughly vetted responses that leverage the collective intelligence of multiple AI models.
+<img width="1915" height="922" alt="image" src="https://github.com/user-attachments/assets/374c1670-02d7-4cc4-a210-94cd6dbd7b2d" />
 
 ---
 
@@ -117,12 +118,14 @@ Fine-tune creativity vs consistency:
 ### Additional Features
 
 - **Live Progress Tracking**: See each model respond in real-time
+- **Council Sizing**: adjust council size from 2 to 8
 - **Abort Anytime**: Cancel in-progress requests
 - **Conversation History**: All conversations saved locally
 - **Import/Export Config**: Backup and share your council configuration
 - **Customizable Prompts**: Edit Stage 1, 2, and 3 system prompts
-- **Rate Limit Warnings**: Alerts when your config may hit API limits
+- **Rate Limit Warnings**: Alerts when your config may hit API limits (when >5 council members)
 - **"I'm Feeling Lucky"**: Randomize your council composition
+- **Import & Export**:  back up your favorite council configurations, system prompts, and settings
 
 ---
 
