@@ -113,6 +113,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+
+  // Ref for chairman select to focus on validation error
+  const chairmanSelectRef = useRef(null);
 
   // Remote/Local filter toggles per model type
   const [councilMemberFilters, setCouncilMemberFilters] = useState({});  // Per-member filters (indexed by member index)
@@ -289,6 +293,14 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       }
     };
   }, [councilModels, chairmanModel, settings]);
+
+  // Clear validation errors when chairman is selected
+  useEffect(() => {
+    if (chairmanModel && validationErrors.chairman) {
+      setValidationErrors({});
+      setError(null);
+    }
+  }, [chairmanModel, validationErrors.chairman]);
 
   const loadSettings = async () => {
     try {
@@ -1156,9 +1168,31 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
     setError(null);
     setSuccess(false);
+    setValidationErrors({});
+
+    // Validate council configuration
+    const hasCouncilMembers = councilModels.some(m => m && m.length > 0);
+    const hasChairman = chairmanModel && chairmanModel.length > 0;
+
+    // If council members are selected but no chairman, show error
+    if (hasCouncilMembers && !hasChairman) {
+      setValidationErrors({ chairman: true });
+      setError('Please select a Chairman to complete the council configuration.');
+      
+      // Focus on the chairman select and scroll to council section
+      setActiveSection('council');
+      setTimeout(() => {
+        if (chairmanSelectRef.current) {
+          chairmanSelectRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          chairmanSelectRef.current.focus();
+        }
+      }, 100);
+      return;
+    }
+
+    setIsSaving(true);
 
     try {
       const updates = {
@@ -1472,6 +1506,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 handleAddCouncilMember={handleAddCouncilMember}
                 setActiveSection={setActiveSection}
                 setActivePromptTab={setActivePromptTab}
+                // Validation
+                validationErrors={validationErrors}
+                chairmanSelectRef={chairmanSelectRef}
               />
             )}
 

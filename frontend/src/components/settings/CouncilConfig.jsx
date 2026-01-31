@@ -44,7 +44,10 @@ export default function CouncilConfig({
     handleRemoveCouncilMember,
     handleAddCouncilMember,
     setActiveSection,
-    setActivePromptTab
+    setActivePromptTab,
+    // Validation
+    validationErrors = {},
+    chairmanSelectRef
 }) {
     // Helper: Check if a source is configured (has API key or is connected)
     const isSourceConfigured = (source) => {
@@ -416,7 +419,10 @@ export default function CouncilConfig({
                             </button>
                         </div>
                     </div>
-                    <div className="chairman-selection">
+                    <div 
+                        className={`chairman-selection ${validationErrors.chairman ? 'validation-error' : ''}`}
+                        ref={chairmanSelectRef}
+                    >
                         <SearchableModelSelect
                             models={filterByRemoteLocal(filteredModels, chairmanFilter)}
                             value={chairmanModel}
@@ -425,6 +431,11 @@ export default function CouncilConfig({
                             isLoading={isLoadingModels}
                             allModels={allModels}
                         />
+                        {validationErrors.chairman && (
+                            <div className="validation-error-message">
+                                ⚠️ Chairman is required when council members are selected
+                            </div>
+                        )}
                     </div>
 
                     {/* Chairman Heat Slider */}

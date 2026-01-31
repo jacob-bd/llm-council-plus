@@ -1594,3 +1594,31 @@ input:checked+.slider:before {
     padding: 10px;
   }
 }
+/* ==================== VALIDATION ERRORS ==================== */
+.chairman-selection.validation-error {
+  animation: shake 0.5s ease-in-out;
+}
+
+.chairman-selection.validation-error .searchable-select-container {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2), 0 0 20px rgba(239, 68, 68, 0.3) !important;
+}
+
+.validation-error-message {
+  color: #ef4444;
+  font-size: 13px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
