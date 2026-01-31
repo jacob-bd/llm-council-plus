@@ -85,8 +85,9 @@ export default function CouncilGrid({
     status = 'idle', // 'idle', 'thinking', 'complete'
     progress = {}    // { currentModel: 'id', completed: ['id1', 'id2'] }
 }) {
-    // If no models provided, show placeholders
-    const displayModels = models.length > 0 ? models : ['placeholder-1', 'placeholder-2', 'placeholder-3'];
+    // Filter out empty/null model IDs, then use placeholders if none remain
+    const validModels = models.filter(m => m && m.trim() !== '');
+    const displayModels = validModels.length > 0 ? validModels : ['placeholder-1', 'placeholder-2', 'placeholder-3'];
 
 
     // Debug: Log model IDs
