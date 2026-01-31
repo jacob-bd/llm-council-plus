@@ -175,7 +175,7 @@ Fine-tune creativity vs consistency:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/llm-council-plus.git
+git clone https://github.com/jacob-bd/llm-council-plus.git
 cd llm-council-plus
 
 # Install backend dependencies
