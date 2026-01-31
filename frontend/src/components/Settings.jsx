@@ -61,10 +61,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [keyValidationStatus, setKeyValidationStatus] = useState({});
 
   // Search API Keys
+  const [serperApiKey, setSerperApiKey] = useState('');
   const [tavilyApiKey, setTavilyApiKey] = useState('');
   const [braveApiKey, setBraveApiKey] = useState('');
+  const [isTestingSerper, setIsTestingSerper] = useState(false);
   const [isTestingTavily, setIsTestingTavily] = useState(false);
   const [isTestingBrave, setIsTestingBrave] = useState(false);
+  const [serperTestResult, setSerperTestResult] = useState(null);
   const [tavilyTestResult, setTavilyTestResult] = useState(null);
   const [braveTestResult, setBraveTestResult] = useState(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -401,6 +404,37 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setCustomEndpointTestResult({ success: false, message: err.message });
     } finally {
       setIsTestingCustomEndpoint(false);
+    }
+  };
+
+  const handleTestSerper = async () => {
+    if (!serperApiKey && !settings.serper_api_key_set) {
+      setSerperTestResult({ success: false, message: 'Please enter an API key first' });
+      return;
+    }
+    setIsTestingSerper(true);
+    setSerperTestResult(null);
+    try {
+      // If input is empty but key is configured, pass null to test the saved key
+      const keyToTest = serperApiKey || null;
+      const result = await api.testSerperKey(keyToTest);
+      setSerperTestResult(result);
+
+      // Auto-save API key if validation succeeds and a new key was provided
+      if (result.success && serperApiKey) {
+        await api.updateSettings({ serper_api_key: serperApiKey });
+        setSerperApiKey(''); // Clear input after save
+
+        // Reload settings
+        await loadSettings();
+
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      setSerperTestResult({ success: false, message: 'Test failed' });
+    } finally {
+      setIsTestingSerper(false);
     }
   };
 
@@ -1374,6 +1408,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 settings={settings}
                 selectedSearchProvider={selectedSearchProvider}
                 setSelectedSearchProvider={setSelectedSearchProvider}
+                // Serper (Google)
+                serperApiKey={serperApiKey}
+                setSerperApiKey={setSerperApiKey}
+                handleTestSerper={handleTestSerper}
+                isTestingSerper={isTestingSerper}
+                serperTestResult={serperTestResult}
+                setSerperTestResult={setSerperTestResult}
                 // Tavily
                 tavilyApiKey={tavilyApiKey}
                 setTavilyApiKey={setTavilyApiKey}

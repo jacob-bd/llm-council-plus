@@ -9,6 +9,13 @@ const SEARCH_PROVIDERS = [
         keyType: null,
     },
     {
+        id: 'serper',
+        name: 'Serper (Google)',
+        description: 'Real Google search results. 2,500 free queries. Fast and accurate.',
+        requiresKey: true,
+        keyType: 'serper',
+    },
+    {
         id: 'tavily',
         name: 'Tavily',
         description: 'Purpose-built for LLMs. Returns rich, relevant content. Requires API key.',
@@ -28,6 +35,13 @@ export default function SearchSettings({
     settings,
     selectedSearchProvider,
     setSelectedSearchProvider,
+    // Serper (Google)
+    serperApiKey,
+    setSerperApiKey,
+    handleTestSerper,
+    isTestingSerper,
+    serperTestResult,
+    setSerperTestResult,
     // Tavily
     tavilyApiKey,
     setTavilyApiKey,
@@ -72,6 +86,49 @@ export default function SearchSettings({
                                 <span className="provider-description">{provider.description}</span>
                             </div>
                         </label>
+
+                        {/* Inline API Key Input for Serper (Google) */}
+                        {selectedSearchProvider === 'serper' && provider.id === 'serper' && (
+                            <div className="inline-api-key-section">
+                                <div className="api-key-input-row">
+                                    <input
+                                        type="password"
+                                        placeholder={settings?.serper_api_key_set ? '••••••••••••••••' : 'Enter Serper API key'}
+                                        value={serperApiKey}
+                                        onChange={e => {
+                                            setSerperApiKey(e.target.value);
+                                            if (setSerperTestResult) setSerperTestResult(null);
+                                        }}
+                                        className={settings?.serper_api_key_set && !serperApiKey ? 'key-configured' : ''}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="test-button"
+                                        onClick={handleTestSerper}
+                                        disabled={isTestingSerper || (!serperApiKey && !settings?.serper_api_key_set)}
+                                    >
+                                        {isTestingSerper ? 'Testing...' : (settings?.serper_api_key_set && !serperApiKey ? 'Retest' : 'Test')}
+                                    </button>
+                                </div>
+                                {settings?.serper_api_key_set && !serperApiKey && (
+                                    <div className="key-status set">✓ API key configured</div>
+                                )}
+                                {serperTestResult && (
+                                    <div className={`test-result ${serperTestResult.success ? 'success' : 'error'}`}>
+                                        {serperTestResult.success ? '✓' : '✗'} {serperTestResult.message}
+                                    </div>
+                                )}
+                                <a 
+                                    href="https://serper.dev" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="api-key-link"
+                                    style={{ marginTop: '8px', display: 'inline-block', fontSize: '12px' }}
+                                >
+                                    Get API key at serper.dev →
+                                </a>
+                            </div>
+                        )}
 
                         {/* Inline API Key Input for Tavily */}
                         {selectedSearchProvider === 'tavily' && provider.id === 'tavily' && (

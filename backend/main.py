@@ -380,6 +380,7 @@ async def get_app_settings():
         # Don't send the API key to frontend for security
 
         # API Key Status
+        "serper_api_key_set": bool(settings.serper_api_key),
         "tavily_api_key_set": bool(settings.tavily_api_key),
         "brave_api_key_set": bool(settings.brave_api_key),
         "openrouter_api_key_set": bool(settings.openrouter_api_key),
@@ -585,6 +586,7 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "custom_endpoint_url": settings.custom_endpoint_url,
 
         # API Key Status
+        "serper_api_key_set": bool(settings.serper_api_key),
         "tavily_api_key_set": bool(settings.tavily_api_key),
         "brave_api_key_set": bool(settings.brave_api_key),
         "openrouter_api_key_set": bool(settings.openrouter_api_key),
@@ -687,6 +689,41 @@ async def test_brave_api(request: TestBraveRequest):
                     "Accept": "application/json",
                     "Accept-Encoding": "gzip",
                     "X-Subscription-Token": request.api_key or settings.brave_api_key,
+                },
+            )
+
+            if response.status_code == 200:
+                return {"success": True, "message": "API key is valid"}
+            elif response.status_code == 401 or response.status_code == 403:
+                return {"success": False, "message": "Invalid API key"}
+            else:
+                return {"success": False, "message": f"API error: {response.status_code}"}
+
+    except httpx.TimeoutException:
+        return {"success": False, "message": "Request timed out"}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+class TestSerperRequest(BaseModel):
+    """Request to test Serper API key."""
+    api_key: str | None = None
+
+
+@app.post("/api/settings/test-serper")
+async def test_serper_api(request: TestSerperRequest):
+    """Test Serper API key with a simple search."""
+    import httpx
+    settings = get_settings()
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://google.serper.dev/search",
+                json={"q": "test", "num": 1},
+                headers={
+                    "X-API-KEY": request.api_key or settings.serper_api_key,
+                    "Content-Type": "application/json",
                 },
             )
 

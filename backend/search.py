@@ -518,6 +518,7 @@ class SearchProvider(str, Enum):
     DUCKDUCKGO = "duckduckgo"
     TAVILY = "tavily"
     BRAVE = "brave"
+    SERPER = "serper"
 
 
 async def perform_web_search(
@@ -559,6 +560,9 @@ async def perform_web_search(
             return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
         elif provider == SearchProvider.BRAVE:
             results = await _search_brave(extracted_query, max_results, full_content_results)
+            return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
+        elif provider == SearchProvider.SERPER:
+            results = await _search_serper(extracted_query, max_results, full_content_results)
             return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
         else:
             # DuckDuckGo - now with hybrid search, optimization, and reranking
@@ -982,3 +986,119 @@ async def _search_brave(query: str, max_results: int = 5, full_content_results: 
     except Exception as e:
         logger.error(f"Brave search error: {e}")
         return "[System Note: Brave search failed. Please try again.]"
+
+
+async def _search_serper(query: str, max_results: int = 10, full_content_results: int = 3) -> str:
+    """
+    Search using Serper.dev API (Google Search results).
+    Optionally fetches full content via Jina Reader for top N results.
+    Requires SERPER_API_KEY environment variable. Uses connection pooling.
+    """
+    start_time = time.time()
+    api_key = os.environ.get("SERPER_API_KEY")
+    if not api_key:
+        logger.error("SERPER_API_KEY not set")
+        return "[System Note: Serper API key not configured. Please add your Serper API key in settings.]"
+
+    try:
+        client = get_async_client()
+        response = await client.post(
+            "https://google.serper.dev/search",
+            json={
+                "q": query,
+                "num": min(max_results, 10),  # Serper max is 10 per request
+            },
+            headers={
+                "X-API-KEY": api_key,
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        search_results_data = []
+        urls_to_fetch = []
+        
+        # Process organic results
+        organic_results = data.get("organic", [])
+        
+        for i, result in enumerate(organic_results[:max_results], 1):
+            title = result.get("title", "No Title")
+            url = result.get("link", "#")
+            snippet = result.get("snippet", "No description available.")
+            position = result.get("position", i)
+
+            search_results_data.append({
+                'index': i,
+                'title': title,
+                'url': url,
+                'summary': snippet,
+                'position': position,
+                'content': None
+            })
+
+            # Queue top N results for full content fetch
+            if full_content_results > 0 and i <= full_content_results and url and url != '#':
+                urls_to_fetch.append((i - 1, url))
+
+        # Fetch full content via Jina Reader for top results IN PARALLEL
+        if urls_to_fetch:
+            elapsed = time.time() - start_time
+            remaining = SEARCH_TIMEOUT_BUDGET - elapsed
+
+            if remaining > 5:
+                fetch_timeout = min(remaining, 25.0)
+
+                async def fetch_with_index(idx: int, url: str):
+                    content = await _fetch_with_jina(url, timeout=fetch_timeout)
+                    return (idx, content)
+
+                tasks = [fetch_with_index(idx, url) for idx, url in urls_to_fetch]
+
+                print(f"⚡ Serper: Starting PARALLEL fetch of {len(tasks)} URLs via Jina Reader...")
+                fetch_start = time.time()
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                fetch_elapsed = time.time() - fetch_start
+                print(f"⚡ Serper: Parallel fetch completed in {fetch_elapsed:.2f}s")
+
+                successful = 0
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.warning(f"Parallel Jina fetch failed: {result}")
+                        continue
+
+                    idx, content = result
+                    if content:
+                        successful += 1
+                        if len(content) < 500:
+                            original_summary = search_results_data[idx]['summary']
+                            content += f"\n\n[System Note: Full content fetch yielded limited text.]\nOriginal Summary: {original_summary}"
+                        search_results_data[idx]['content'] = content
+                print(f"⚡ Serper: Successfully fetched content from {successful}/{len(tasks)} URLs")
+            else:
+                logger.warning("Search timeout budget exhausted, skipping content fetches")
+
+        if not search_results_data:
+            return "No web search results found."
+
+        # Format results
+        formatted = []
+        for r in search_results_data:
+            text = f"Result {r['index']}:\nTitle: {r['title']}\nURL: {r['url']}"
+            if r.get('content'):
+                content = r['content'][:2000]
+                if len(r['content']) > 2000:
+                    content += "..."
+                text += f"\nContent:\n{content}"
+            else:
+                text += f"\nSummary: {r['summary']}"
+            formatted.append(text)
+
+        return "\n\n".join(formatted)
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Serper API error: {e.response.status_code} - {e.response.text}")
+        return "[System Note: Serper search failed. Please check your API key.]"
+    except Exception as e:
+        logger.error(f"Serper search error: {e}")
+        return "[System Note: Serper search failed. Please try again.]"
