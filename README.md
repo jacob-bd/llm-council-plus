@@ -213,6 +213,34 @@ npm run dev
 
 Then open **http://localhost:5173** in your browser.
 
+### Docker / VPS Deployment
+
+Build and run the app as a single container:
+
+```bash
+docker compose up -d --build
+```
+
+Then open **http://YOUR_SERVER_IP:8001**.
+
+The compose file stores conversations and settings in `./data` on the host:
+
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+For a domain behind a reverse proxy, point the proxy to `http://127.0.0.1:8001`.
+When the frontend and API are served from the same domain, leave `BACKEND_HOST`
+empty. If you serve the frontend separately, set:
+
+```bash
+BACKEND_HOST=https://api.example.com
+FRONTEND_HOST=https://council.example.com
+```
+
+`FRONTEND_HOST` may contain multiple comma-separated origins.
+
 ### Network Access
 
 The application is configured to be accessible from other devices on your local network.

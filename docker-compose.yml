@@ -1,0 +1,16 @@
+services:
+  llm-council-plus:
+    build: .
+    ports:
+      - "${PORT:-8001}:8001"
+    environment:
+      # Leave empty when serving frontend and API from this container.
+      # Set to a full URL when the frontend is served elsewhere, for example:
+      # BACKEND_HOST=https://api.example.com
+      BACKEND_HOST: "${BACKEND_HOST:-}"
+      # Comma-separated browser origins allowed to call the API.
+      # Example: FRONTEND_HOST=https://council.example.com,http://1.2.3.4:8001
+      FRONTEND_HOST: "${FRONTEND_HOST:-}"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

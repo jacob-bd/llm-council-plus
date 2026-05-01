@@ -2,7 +2,8 @@
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import os
@@ -17,11 +18,19 @@ from .settings import get_settings, update_settings, Settings, DEFAULT_COUNCIL_M
 
 app = FastAPI(title="LLM Council Plus API")
 
-# Enable CORS for local development and network access
-# Allow requests from any hostname on ports 5173 and 3000 (frontend)
+CORS_FRONTEND_HOSTS = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_HOST", "").split(",")
+    if origin.strip()
+]
+
+# Enable CORS for local development and network access.
+# FRONTEND_HOST may contain one or more comma-separated origins in production,
+# for example: https://council.example.com,http://1.2.3.4:5173
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://.*:(5173|5174|3000)",
+    allow_origins=CORS_FRONTEND_HOSTS,
+    allow_origin_regex=None if CORS_FRONTEND_HOSTS else r"http://.*:(5173|5174|3000)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,9 +65,24 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
+FRONTEND_DIST_DIR = os.getenv(
+    "FRONTEND_DIST_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist"),
+)
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "ok", "service": "LLM Council API"}
+
+
 @app.get("/")
 async def root():
-    """Health check endpoint."""
+    """Serve the frontend when built, otherwise return a basic health check."""
+    index_path = os.path.join(FRONTEND_DIST_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {"status": "ok", "service": "LLM Council API"}
 
 
@@ -978,6 +1002,10 @@ async def test_openrouter_api(request: TestOpenRouterRequest):
         return {"success": False, "message": "Request timed out"}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+if os.path.isdir(FRONTEND_DIST_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True), name="frontend")
 
 
 if __name__ == "__main__":
