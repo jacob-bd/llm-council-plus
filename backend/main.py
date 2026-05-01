@@ -24,9 +24,7 @@ CORS_FRONTEND_HOSTS = [
     if origin.strip()
 ]
 
-# Enable CORS for local development and network access.
-# FRONTEND_HOST may contain one or more comma-separated origins in production,
-# for example: https://council.example.com,http://1.2.3.4:5173
+# In production, FRONTEND_HOST can contain comma-separated allowed origins.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_FRONTEND_HOSTS,
