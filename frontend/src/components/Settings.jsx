@@ -46,6 +46,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [isTestingCustomEndpoint, setIsTestingCustomEndpoint] = useState(false);
   const [customEndpointTestResult, setCustomEndpointTestResult] = useState(null);
 
+  // LM Studio State
+  const [lmStudioBaseUrl, setLmStudioBaseUrl] = useState('http://alexs-mac-mini.local:1234/v1');
+  const [lmStudioApiKey, setLmStudioApiKey] = useState('');
+  const [lmStudioModels, setLmStudioModels] = useState([]);
+  const [isTestingLmStudio, setIsTestingLmStudio] = useState(false);
+  const [lmStudioTestResult, setLmStudioTestResult] = useState(null);
+
   // Direct Provider State
   const [directKeys, setDirectKeys] = useState({
     openai_api_key: '',
@@ -78,7 +85,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     ollama: false,
     groq: false,
     direct: false,  // Master toggle for all direct connections
-    custom: false   // Custom OpenAI-compatible endpoint
+    custom: false,  // Custom OpenAI-compatible endpoint
+    lmstudio: false  // LM Studio local provider
   });
 
   // Individual direct provider toggles
@@ -190,7 +198,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
   // Helper to determine if filters need to switch based on availability
   const isRemoteAvailable = enabledProviders.openrouter || enabledProviders.direct || enabledProviders.groq || enabledProviders.custom;
-  const isLocalAvailable = enabledProviders.ollama;
+  const isLocalAvailable = enabledProviders.ollama || enabledProviders.lmstudio;
 
   const getNewFilter = (currentFilter) => {
     if (currentFilter === 'remote' && !isRemoteAvailable && isLocalAvailable) return 'local';
@@ -338,11 +346,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         const hasDirectConfigured = !!(data.openai_api_key_set || data.anthropic_api_key_set ||
           data.google_api_key_set || data.mistral_api_key_set || data.deepseek_api_key_set);
 
-        setEnabledProviders({
+          setEnabledProviders({
           openrouter: !!data.openrouter_api_key_set || (!hasDirectConfigured && !ollamaStatus?.connected && !data.groq_api_key_set),
           ollama: ollamaStatus?.connected || false,
           groq: !!data.groq_api_key_set,
-          direct: hasDirectConfigured
+          direct: hasDirectConfigured,
+          lmstudio: !!data.lm_studio_base_url
         });
       }
 
@@ -387,6 +396,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       // Ollama Settings
       setOllamaBaseUrl(data.ollama_base_url || 'http://localhost:11434');
 
+      // LM Studio Settings
+      setLmStudioBaseUrl(data.lm_studio_base_url || 'http://alexs-mac-mini.local:1234/v1');
+
       // Custom Endpoint Settings
       if (data.custom_endpoint_name) setCustomEndpointName(data.custom_endpoint_name);
       if (data.custom_endpoint_url) setCustomEndpointUrl(data.custom_endpoint_url);
@@ -413,6 +425,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       // Load available models in background
       loadModels();
       loadOllamaModels(data.ollama_base_url || 'http://localhost:11434');
+      loadLmStudioModels();
       if (data.custom_endpoint_url) {
         loadCustomEndpointModels();
       }
@@ -475,6 +488,18 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     }
   };
 
+  const loadLmStudioModels = async () => {
+    try {
+      const data = await api.getLmStudioModels();
+      if (data.models && data.models.length > 0) {
+        const sorted = data.models.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setLmStudioModels(sorted);
+      }
+    } catch (err) {
+      console.warn('Failed to load LM Studio models:', err);
+    }
+  };
+
   const handleTestCustomEndpoint = async () => {
     if (!customEndpointName || !customEndpointUrl) {
       setCustomEndpointTestResult({ success: false, message: 'Please enter a name and URL' });
@@ -503,6 +528,36 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setCustomEndpointTestResult({ success: false, message: err.message });
     } finally {
       setIsTestingCustomEndpoint(false);
+    }
+  };
+
+  const handleTestLmStudio = async () => {
+    if (!lmStudioBaseUrl) {
+      setLmStudioTestResult({ success: false, message: 'Please enter a URL' });
+      return;
+    }
+    setIsTestingLmStudio(true);
+    setLmStudioTestResult(null);
+    try {
+      const result = await api.testLmStudioConnection(lmStudioBaseUrl, lmStudioApiKey);
+      setLmStudioTestResult(result);
+
+      // Auto-save if connection succeeds
+      if (result.success) {
+        await api.updateSettings({
+          lm_studio_base_url: lmStudioBaseUrl,
+          lm_studio_api_key: lmStudioApiKey || null
+        });
+        // Reload settings to get the updated state
+        const updatedSettings = await api.getSettings();
+        setSettings(updatedSettings);
+        // Load models from LM Studio
+        loadLmStudioModels();
+      }
+    } catch (err) {
+      setLmStudioTestResult({ success: false, message: err.message });
+    } finally {
+      setIsTestingLmStudio(false);
     }
   };
 
@@ -1475,6 +1530,16 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 ollamaTestResult={ollamaTestResult}
                 ollamaStatus={ollamaStatus}
                 loadOllamaModels={loadOllamaModels}
+                // LM Studio
+                lmStudioBaseUrl={lmStudioBaseUrl}
+                setLmStudioBaseUrl={(val) => { setLmStudioBaseUrl(val); setLmStudioTestResult(null); }}
+                lmStudioApiKey={lmStudioApiKey}
+                setLmStudioApiKey={(val) => { setLmStudioApiKey(val); setLmStudioTestResult(null); }}
+                handleTestLmStudio={handleTestLmStudio}
+                isTestingLmStudio={isTestingLmStudio}
+                lmStudioTestResult={lmStudioTestResult}
+                lmStudioModels={lmStudioModels}
+                loadLmStudioModels={loadLmStudioModels}
                 // Direct
                 directKeys={directKeys}
                 setDirectKeys={setDirectKeys}

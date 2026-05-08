@@ -20,7 +20,8 @@ DEFAULT_ENABLED_PROVIDERS = {
     "ollama": False,
     "groq": False,
     "direct": False,  # Master toggle for all direct connections
-    "custom": False   # Custom OpenAI-compatible endpoint
+    "custom": False,  # Custom OpenAI-compatible endpoint
+    "lmstudio": False  # LM Studio local provider
 }
 
 # Default direct provider toggles (individual)
@@ -30,7 +31,8 @@ DEFAULT_DIRECT_PROVIDER_TOGGLES = {
     "google": False,
     "mistral": False,
     "deepseek": False,
-    "groq": False
+    "groq": False,
+    "lmstudio": False
 }
 
 
@@ -87,6 +89,10 @@ class Settings(BaseModel):
 
     # Ollama Settings
     ollama_base_url: str = "http://localhost:11434"
+
+    # LM Studio Settings
+    lm_studio_base_url: str = "http://alexs-mac-mini.local:1234/v1"
+    lm_studio_api_key: Optional[str] = None
 
     # Custom OpenAI-compatible endpoint
     custom_endpoint_name: Optional[str] = None

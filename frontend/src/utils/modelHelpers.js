@@ -10,6 +10,11 @@ export const getModelVisuals = (modelId) => {
     return { name: 'Ollama', color: '#f1f5f9', short: 'Local', icon: '🦙' };
   }
 
+  // LM Studio - CHECK BEFORE OpenAI/GPT substring matches
+  if (id.startsWith('lmstudio:')) {
+    return { name: 'LM Studio', color: '#10b981', short: 'LM', icon: '🖥️' };
+  }
+
   // OpenAI
   if (id.includes('openai') || id.includes('gpt')) {
     return { name: 'OpenAI', color: '#10a37f', short: 'GPT', icon: '🤖' };

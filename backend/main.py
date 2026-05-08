@@ -341,7 +341,10 @@ class UpdateSettingsRequest(BaseModel):
     search_provider: Optional[str] = None
     search_keyword_extraction: Optional[str] = None
     ollama_base_url: Optional[str] = None
-    full_content_results: Optional[int] = None
+
+    # LM Studio Settings
+    lm_studio_base_url: Optional[str] = None
+    lm_studio_api_key: Optional[str] = None
 
     # Custom OpenAI-compatible endpoint
     custom_endpoint_name: Optional[str] = None
@@ -401,6 +404,7 @@ async def get_app_settings():
         "search_provider": settings.search_provider,
         "search_keyword_extraction": settings.search_keyword_extraction,
         "ollama_base_url": settings.ollama_base_url,
+        "lm_studio_base_url": settings.lm_studio_base_url,
         "full_content_results": settings.full_content_results,
 
         # Custom Endpoint
@@ -493,6 +497,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
 
     if request.ollama_base_url is not None:
         updates["ollama_base_url"] = request.ollama_base_url
+
+    # LM Studio
+    if request.lm_studio_base_url is not None:
+        updates["lm_studio_base_url"] = request.lm_studio_base_url
+    if request.lm_studio_api_key is not None:
+        updates["lm_studio_api_key"] = request.lm_studio_api_key
 
     # Custom endpoint
     if request.custom_endpoint_name is not None:
@@ -614,11 +624,13 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "search_provider": settings.search_provider,
         "search_keyword_extraction": settings.search_keyword_extraction,
         "ollama_base_url": settings.ollama_base_url,
+        "lm_studio_base_url": settings.lm_studio_base_url,
         "full_content_results": settings.full_content_results,
 
         # Custom Endpoint
         "custom_endpoint_name": settings.custom_endpoint_name,
         "custom_endpoint_url": settings.custom_endpoint_url,
+        # Don't send the API key to the frontend
 
         # API Key Status
         "serper_api_key_set": bool(settings.serper_api_key),
@@ -660,7 +672,7 @@ async def get_direct_models():
     # Iterate over all providers
     for provider_id, provider in PROVIDERS.items():
         # Skip OpenRouter and Ollama as they are handled separately
-        if provider_id in ["openrouter", "ollama", "hybrid"]:
+        if provider_id in ["openrouter", "ollama", "lmstudio", "hybrid"]:
             continue
             
         try:
@@ -908,6 +920,33 @@ async def get_custom_endpoint_models():
         return {"models": [], "error": "No custom endpoint configured"}
 
     provider = CustomOpenAIProvider()
+    models = await provider.get_models()
+    return {"models": models}
+
+
+class TestLmStudioRequest(BaseModel):
+    """Request to test LM Studio connection."""
+    url: str
+    api_key: Optional[str] = None
+
+
+@app.post("/api/settings/test-lmstudio")
+async def test_lm_studio(request: TestLmStudioRequest):
+    """Test connection to LM Studio instance."""
+    from .providers.lm_studio import LmStudioProvider
+
+    provider = LmStudioProvider()
+    return await provider.validate_connection(request.url, request.api_key or "")
+
+
+@app.get("/api/lmstudio/models")
+async def get_lm_studio_models():
+    """Fetch available models from LM Studio."""
+    from .providers.lm_studio import LmStudioProvider
+    from .settings import get_settings
+
+    settings = get_settings()
+    provider = LmStudioProvider()
     models = await provider.get_models()
     return {"models": models}
 

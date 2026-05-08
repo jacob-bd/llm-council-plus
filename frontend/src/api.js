@@ -207,6 +207,23 @@ export const api = {
   },
 
   /**
+   * Test LM Studio connection.
+   */
+  async testLmStudioConnection(url, apiKey) {
+    const response = await fetch(`${API_BASE}/api/settings/test-lmstudio`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url, api_key: apiKey || null }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to test LM Studio connection');
+    }
+    return response.json();
+  },
+
+  /**
    * Test custom OpenAI-compatible endpoint.
    */
   async testCustomEndpoint(name, url, apiKey) {
@@ -256,6 +273,17 @@ export const api = {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to get Ollama models');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get available models from LM Studio.
+   */
+  async getLmStudioModels() {
+    const response = await fetch(`${API_BASE}/api/lmstudio/models`);
+    if (!response.ok) {
+      throw new Error('Failed to get LM Studio models');
     }
     return response.json();
   },

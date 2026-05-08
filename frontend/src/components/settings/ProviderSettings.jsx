@@ -47,6 +47,16 @@ export default function ProviderSettings({
     ollamaTestResult,
     ollamaStatus,
     loadOllamaModels,
+    // LM Studio
+    lmStudioBaseUrl,
+    setLmStudioBaseUrl,
+    lmStudioApiKey,
+    setLmStudioApiKey,
+    handleTestLmStudio,
+    isTestingLmStudio,
+    lmStudioTestResult,
+    lmStudioModels,
+    loadLmStudioModels,
     // Direct
     directKeys,
     setDirectKeys,
@@ -216,6 +226,66 @@ export default function ProviderSettings({
                         Refresh Local Models
                     </button>
                 </div>
+            </form>
+
+            {/* LM Studio */}
+            <form className="api-key-section" onSubmit={e => e.preventDefault()}>
+                <label>
+                    <img src={ollamaIcon} alt="" className="provider-icon" />
+                    LM Studio (OpenAI-compatible)
+                </label>
+                <p className="api-key-hint" style={{ marginBottom: '8px' }}>
+                    Run LM Studio locally and connect via its OpenAI-compatible API. Default: <code>http://alexs-mac-mini.local:1234/v1</code>
+                </p>
+                <div className="api-key-input-row" style={{ marginBottom: '8px' }}>
+                    <input
+                        type="text"
+                        placeholder="http://alexs-mac-mini.local:1234/v1"
+                        value={lmStudioBaseUrl}
+                        onChange={(e) => {
+                            setLmStudioBaseUrl(e.target.value);
+                        }}
+                        className="wide-input"
+                    />
+                </div>
+                <div className="api-key-input-row" style={{ marginBottom: '8px' }}>
+                    <input
+                        type="password"
+                        placeholder="API Key (optional)"
+                        value={lmStudioApiKey}
+                        onChange={(e) => {
+                            setLmStudioApiKey(e.target.value);
+                        }}
+                    />
+                </div>
+                <div className="api-key-input-row">
+                    <button
+                        className="test-button"
+                        onClick={handleTestLmStudio}
+                        disabled={!lmStudioBaseUrl || isTestingLmStudio}
+                    >
+                        {isTestingLmStudio ? 'Testing...' : 'Connect'}
+                    </button>
+                </div>
+                {lmStudioTestResult && (
+                    <div className={`test-result ${lmStudioTestResult.success ? 'success' : 'error'}`}>
+                        {lmStudioTestResult.message}
+                    </div>
+                )}
+                <div className="model-options-row" style={{ marginTop: '12px' }}>
+                    <button
+                        type="button"
+                        className="reset-defaults-button"
+                        onClick={loadLmStudioModels}
+                    >
+                        Refresh Models
+                    </button>
+                </div>
+                {lmStudioModels && lmStudioModels.length > 0 && (
+                    <div className="model-options-row" style={{ marginTop: '8px', fontSize: '0.85rem', color: '#888' }}>
+                        {lmStudioModels.length} model{lmStudioModels.length !== 1 ? 's' : ''} available
+                    </div>
+                )}
             </form>
 
             {/* Direct LLM API Connections */}
