@@ -35,6 +35,7 @@ export default function CouncilConfig({
     allModels, // Result of getAllAvailableModels()
     filteredModels, // Result of getFilteredAvailableModels()
     ollamaAvailableModels,
+    lmStudioModels,
     customEndpointName,
     customEndpointUrl,
     // Callbacks
@@ -61,6 +62,7 @@ export default function CouncilConfig({
             case 'google': return !!settings?.google_api_key_set;
             case 'mistral': return !!settings?.mistral_api_key_set;
             case 'deepseek': return !!settings?.deepseek_api_key_set;
+            case 'lmstudio': return !!(settings?.lm_studio_base_url);
             default: return false;
         }
     };
@@ -68,11 +70,11 @@ export default function CouncilConfig({
     // Helper: Filter models by remote/local for specific use case
     const filterByRemoteLocal = (models, filter) => {
         if (filter === 'local') {
-            // Only Ollama models
-            return models.filter(m => m.id.startsWith('ollama:'));
+            // Ollama and LM Studio models
+            return models.filter(m => m.id.startsWith('ollama:') || m.id.startsWith('lmstudio:'));
         } else {
-            // Remote: OpenRouter + Direct providers (exclude Ollama)
-            return models.filter(m => !m.id.startsWith('ollama:'));
+            // Remote: OpenRouter + Direct providers (exclude local)
+            return models.filter(m => !m.id.startsWith('ollama:') && !m.id.startsWith('lmstudio:'));
         }
     };
 
@@ -122,6 +124,22 @@ export default function CouncilConfig({
                                 <span className="slider"></span>
                             </div>
                             <span className="toggle-text">Local (Ollama)</span>
+                        </label>
+
+                        <label 
+                            className={`toggle-wrapper ${!isSourceConfigured('lmstudio') ? 'source-disabled' : ''}`}
+                            title={!isSourceConfigured('lmstudio') ? 'SOURCE NOT CONFIGURED - Connect LM Studio in LLM API Keys' : ''}
+                        >
+                            <div className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={enabledProviders.lmstudio}
+                                    onChange={(e) => setEnabledProviders(prev => ({ ...prev, lmstudio: e.target.checked }))}
+                                    disabled={!isSourceConfigured('lmstudio')}
+                                />
+                                <span className="slider"></span>
+                            </div>
+                            <span className="toggle-text">Local (LM Studio)</span>
                         </label>
 
                         <label 
@@ -291,13 +309,13 @@ export default function CouncilConfig({
                                             type="button"
                                             className={`type-btn ${memberFilter === 'local' ? 'active' : ''}`}
                                             onClick={() => handleMemberFilterChange(index, 'local')}
-                                            disabled={!enabledProviders.ollama || ollamaAvailableModels.length === 0}
-                                            title={!enabledProviders.ollama || ollamaAvailableModels.length === 0 ? 'Enable and connect Ollama first' : ''}
+                                            disabled={(!enabledProviders.ollama || ollamaAvailableModels.length === 0) && (!enabledProviders.lmstudio || lmStudioModels.length === 0)}
+                                            title={(!enabledProviders.ollama || ollamaAvailableModels.length === 0) && (!enabledProviders.lmstudio || lmStudioModels.length === 0) ? 'Enable and connect a local provider (Ollama or LM Studio) first' : ''}
                                         >
                                             Local
                                         </button>
                                     </div>
-                                    <div className={`model-select-wrapper ${hasValidationError ? 'validation-error' : ''}`}>
+                                    <div className="model-select-wrapper" style={{ flex: 1 }}>
                                         <SearchableModelSelect
                                             models={filterByRemoteLocal(filteredModels, memberFilter)}
                                             value={modelId}
@@ -418,19 +436,14 @@ export default function CouncilConfig({
                                     setChairmanFilter('local');
                                     setChairmanModel('');
                                 }}
-                                disabled={!enabledProviders.ollama || ollamaAvailableModels.length === 0}
-                                title={!enabledProviders.ollama || ollamaAvailableModels.length === 0 ? 'Enable and connect Ollama first' : ''}
-                            >
-                                Local
-                            </button>
-                        </div>
-                    </div>
-                    <div 
-                        className={`chairman-selection ${validationErrors.chairman ? 'validation-error' : ''}`}
-                        ref={chairmanSelectRef}
-                    >
-                        <SearchableModelSelect
-                            models={filterByRemoteLocal(filteredModels, chairmanFilter)}
+                                            disabled={(!enabledProviders.ollama || ollamaAvailableModels.length === 0) && (!enabledProviders.lmstudio || lmStudioModels.length === 0)}
+                                            title={(!enabledProviders.ollama || ollamaAvailableModels.length === 0) && (!enabledProviders.lmstudio || lmStudioModels.length === 0) ? 'Enable and connect a local provider (Ollama or LM Studio) first' : ''}
+                                        >
+                                            Local
+                                        </button>
+                                    </div>
+                                    <SearchableModelSelect
+                                        models={filterByRemoteLocal(filteredModels, chairmanFilter)}
                             value={chairmanModel}
                             onChange={(value) => setChairmanModel(value)}
                             placeholder="Search models..."

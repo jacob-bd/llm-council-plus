@@ -29,8 +29,9 @@ CORS_FRONTEND_HOSTS = [
     if origin.strip()
 ]
 
-# Suppress the dev-ports regex when the built frontend exists — same-origin, no CORS needed.
-_dev_cors_regex = None if (os.path.isdir(FRONTEND_DIST_DIR) or CORS_FRONTEND_HOSTS) else r"http://.*:(5173|5174|3000)"
+# Always include standard dev-server ports for local development.
+# In production (via FRONTEND_HOST), the origin list provides explicit CORS.
+_dev_cors_regex = r"http://.*:(5173|5174|3000)"
 
 app.add_middleware(
     CORSMiddleware,
@@ -341,6 +342,7 @@ class UpdateSettingsRequest(BaseModel):
     search_provider: Optional[str] = None
     search_keyword_extraction: Optional[str] = None
     ollama_base_url: Optional[str] = None
+    full_content_results: Optional[int] = None
 
     # LM Studio Settings
     lm_studio_base_url: Optional[str] = None

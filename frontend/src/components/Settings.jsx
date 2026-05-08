@@ -876,7 +876,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
     // Helper to determine filter type (remote/local) from model ID
     const getFilterForModel = (modelId) => {
-      return modelId.startsWith('ollama:') ? 'local' : 'remote';
+      return (modelId.startsWith('ollama:') || modelId.startsWith('lmstudio:')) ? 'local' : 'remote';
     };
 
     // 2. Randomize Council Members (Unique if possible)
@@ -921,7 +921,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     // Determine best default filter based on what's available
     let defaultFilter = 'remote';
     const isRemoteAvailable = enabledProviders.openrouter || enabledProviders.direct || enabledProviders.groq || enabledProviders.custom;
-    const isLocalAvailable = enabledProviders.ollama && ollamaAvailableModels.length > 0;
+    const isLocalAvailable = (enabledProviders.ollama && ollamaAvailableModels.length > 0) || (enabledProviders.lmstudio && lmStudioModels.length > 0);
 
     if (!isRemoteAvailable && isLocalAvailable) {
       defaultFilter = 'local';
@@ -1392,6 +1392,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       models.push(...customEndpointModels);
     }
 
+    // Add LM Studio models if enabled
+    if (enabledProviders.lmstudio) {
+      models.push(...lmStudioModels);
+    }
+
     // Deduplicate by model ID (prefer direct connections over OpenRouter for same model)
     // Since direct models are added last, always set to overwrite earlier entries
     const uniqueModels = new Map();
@@ -1408,7 +1413,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     customEndpointModels,
     directProviderToggles,
     directKeys,
-    settings
+    settings,
+    lmStudioModels
   ]);
 
   // Get filtered models for council member selection (respects free filter)
@@ -1438,11 +1444,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   // Filter models by remote/local for specific use case
   const filterByRemoteLocal = (models, filter) => {
     if (filter === 'local') {
-      // Only Ollama models
-      return models.filter(m => m.id.startsWith('ollama:'));
+      return models.filter(m => m.id.startsWith('ollama:') || m.id.startsWith('lmstudio:'));
     } else {
-      // Remote: OpenRouter + Direct providers (exclude Ollama)
-      return models.filter(m => !m.id.startsWith('ollama:'));
+      return models.filter(m => !m.id.startsWith('ollama:') && !m.id.startsWith('lmstudio:'));
     }
   };
 
@@ -1588,6 +1592,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 allModels={allAvailableModels}
                 filteredModels={filteredAvailableModels}
                 ollamaAvailableModels={ollamaAvailableModels}
+                lmStudioModels={lmStudioModels}
                 customEndpointName={customEndpointName}
                 customEndpointUrl={customEndpointUrl}
                 // Callbacks

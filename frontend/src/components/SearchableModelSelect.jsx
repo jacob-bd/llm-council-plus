@@ -20,11 +20,14 @@ export default function SearchableModelSelect({
     // Use source field if available, otherwise fallback to provider check
     const isOpenRouter = model.source === 'openrouter' || model.provider === 'OpenRouter';
     const isOllama = model.id?.startsWith('ollama:') || model.provider === 'Ollama';
+    const isLmStudio = model.id?.startsWith('lmstudio:') || model.provider === 'LM Studio';
 
     if (isOpenRouter) {
       groupLabel = 'OpenRouter (Cloud)';
     } else if (isOllama) {
       groupLabel = 'Local (Ollama)';
+    } else if (isLmStudio) {
+      groupLabel = 'Local (LM Studio)';
     } else {
       groupLabel = `${model.provider || 'Direct'} (Direct)`;
     }
@@ -45,7 +48,8 @@ export default function SearchableModelSelect({
     'OpenAI (Direct)', 'Anthropic (Direct)', 'Google (Direct)', 'Mistral (Direct)', 'DeepSeek (Direct)',
     'Groq (Direct)',
     'OpenRouter (Cloud)',
-    'Local (Ollama)'
+    'Local (Ollama)',
+    'Local (LM Studio)'
   ];
 
   const options = Object.keys(groupedOptions)
