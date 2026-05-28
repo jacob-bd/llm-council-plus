@@ -104,7 +104,7 @@ CORS_FRONTEND_HOSTS = [
     if origin.strip()
 ]
 
-_dev_cors_regex = r"https?://(localhost|127\.0\.0\.1):\d+"
+_dev_cors_regex = r"https?://(localhost|127\.0\.0\.1|(?:\d{1,3}\.){3}\d{1,3}|\[[a-fA-F0-9:]+\]):\d+"
 
 app.add_middleware(
     CORSMiddleware,
@@ -505,6 +505,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                 try:
                     title = await title_task
                     storage.update_conversation_title(conversation_id, title)
+                    conversation["title"] = title
                     yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
                 except Exception as e:
                     print(f"Error waiting for title task: {e}")

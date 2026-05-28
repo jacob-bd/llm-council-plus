@@ -261,7 +261,6 @@ def add_assistant_message(
         message["metadata"] = metadata
 
     conversation["messages"].append(message)
-
     save_conversation(conversation)
 
 

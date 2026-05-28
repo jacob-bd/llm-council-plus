@@ -30,6 +30,9 @@ const DIRECT_PROVIDERS = [
 
 export default function ProviderSettings({
     settings,
+    availableModels = [],
+    directAvailableModels = [],
+    ollamaAvailableModels = [],
     // OpenRouter
     openrouterApiKey,
     setOpenrouterApiKey,
@@ -68,6 +71,22 @@ export default function ProviderSettings({
     customEndpointTestResult,
     customEndpointModels
 }) {
+    const getDirectProviderModelsCount = (providerId) => {
+        const providerNameMap = {
+            openai: 'OpenAI',
+            anthropic: 'Anthropic',
+            google: 'Google',
+            mistral: 'Mistral',
+            deepseek: 'DeepSeek',
+            nvidia: 'NVIDIA'
+        };
+        const name = providerNameMap[providerId];
+        if (!name) return 0;
+        return directAvailableModels.filter(m => m.provider === name).length;
+    };
+
+    const groqModelsCount = directAvailableModels.filter(m => m.provider === 'Groq').length;
+
     return (
         <section className="settings-section">
             <h3>LLM API Keys</h3>
@@ -117,7 +136,10 @@ export default function ProviderSettings({
                     </button>
                 </div>
                 {settings?.openrouter_api_key_set && !openrouterApiKey && (
-                    <div className="key-status set">✓ API key configured</div>
+                    <div className="key-status set">
+                        ✓ API key configured
+                        {availableModels.length > 0 && ` · ${availableModels.length} models available`}
+                    </div>
                 )}
                 {openrouterTestResult && (
                     <div className={`test-result ${openrouterTestResult.success ? 'success' : 'error'}`}>
@@ -155,7 +177,10 @@ export default function ProviderSettings({
                     </button>
                 </div>
                 {settings?.groq_api_key_set && !groqApiKey && (
-                    <div className="key-status set">✓ API key configured</div>
+                    <div className="key-status set">
+                        ✓ API key configured
+                        {groqModelsCount > 0 && ` · ${groqModelsCount} models available`}
+                    </div>
                 )}
                 {groqTestResult && (
                     <div className={`test-result ${groqTestResult.success ? 'success' : 'error'}`}>
@@ -200,7 +225,10 @@ export default function ProviderSettings({
                     <div className="ollama-auto-status connected">
                         <span className="status-indicator connected">●</span>
                         <span className="status-text">
-                            <strong>Connected</strong> <span className="status-separator">·</span> <span className="status-time">Last: {new Date(ollamaStatus.lastConnected).toLocaleTimeString()}</span>
+                            <strong>Connected</strong>
+                            {ollamaAvailableModels.length > 0 && ` · ${ollamaAvailableModels.length} models available`}
+                            <span className="status-separator">·</span>
+                            <span className="status-time">Last: {new Date(ollamaStatus.lastConnected).toLocaleTimeString()}</span>
                         </span>
                     </div>
                 )}
@@ -247,7 +275,10 @@ export default function ProviderSettings({
                             </button>
                         </div>
                         {settings?.[`${dp.key}_set`] && !directKeys[dp.key] && (
-                            <div className="key-status set">✓ API key configured</div>
+                            <div className="key-status set">
+                                ✓ API key configured
+                                {getDirectProviderModelsCount(dp.id) > 0 && ` · ${getDirectProviderModelsCount(dp.id)} models available`}
+                            </div>
                         )}
                         {keyValidationStatus[dp.id] && (
                             <div className={`test-result ${keyValidationStatus[dp.id].success ? 'success' : 'error'}`}>

@@ -117,7 +117,7 @@ export default function ChatInterface({
             container.scrollHeight - container.scrollTop - container.clientHeight < 150;
 
         if (isNearBottom) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            messagesEndRef.current?.scrollIntoView({ behavior: isLoading ? 'auto' : 'smooth' });
         }
     }, [conversation]);
 
@@ -303,7 +303,7 @@ export default function ChatInterface({
                                                         currentModel: msg.progress?.stage1?.currentModel,
                                                         completed: msg.stage1?.map(r => r.model) || []
                                                     }}
-                                                    showChairman={executionMode === 'full'}
+                                                    showChairman={(msg.metadata?.execution_mode || executionMode) === 'full'}
                                                 />
                                             </div>
                                         )}

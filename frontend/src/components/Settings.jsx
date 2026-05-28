@@ -1568,6 +1568,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             {activeSection === 'llm_keys' && (
               <ProviderSettings
                 settings={settings}
+                availableModels={availableModels}
+                directAvailableModels={directAvailableModels}
                 // OpenRouter
                 openrouterApiKey={openrouterApiKey}
                 setOpenrouterApiKey={(val) => { setOpenrouterApiKey(val); setOpenrouterTestResult(null); }}
@@ -1582,6 +1584,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 groqTestResult={groqTestResult}
                 // Ollama
                 ollamaBaseUrl={ollamaBaseUrl}
+                ollamaAvailableModels={ollamaAvailableModels}
                 setOllamaBaseUrl={(val) => { setOllamaBaseUrl(val); setOllamaTestResult(null); }}
                 handleTestOllama={handleTestOllama}
                 isTestingOllama={isTestingOllama}
