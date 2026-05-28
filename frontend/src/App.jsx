@@ -444,7 +444,7 @@ function App() {
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
                   ...lastMsg,
-                  currentRound: event.round || lastMsg.currentRound,
+                  currentRound: event.round || event.data?.round_number || lastMsg.currentRound,
                 };
                 return { ...prev, messages };
               });

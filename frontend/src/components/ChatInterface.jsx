@@ -241,7 +241,7 @@ export default function ChatInterface({
                                         rounds={msg.rounds || []}
                                         verdict={msg.verdict || null}
                                         tiebreaker={msg.tiebreaker || null}
-                                        currentRound={msg.currentRound || 0}
+                                        currentRound={msg.currentRound || msg.rounds?.length || 1}
                                         maxRounds={msg.maxRounds || msg.metadata?.max_rounds || 3}
                                         isRunning={msg.isRunning || false}
                                         question={msg.question || ''}
