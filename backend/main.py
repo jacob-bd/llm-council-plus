@@ -178,7 +178,12 @@ def _apply_search_env(settings: Settings, provider_override: Optional[str] = Non
 async def _fetch_search_context(content: str, settings: Settings, provider_override: Optional[str] = None) -> tuple:
     """Run web search and return (search_context, search_query)."""
     provider = _apply_search_env(settings, provider_override)
-    search_query = await generate_search_query(content)
+    # Use LLM query generation only when explicitly selected and not using DuckDuckGo
+    # (DDG has built-in query optimization; no need to pre-process)
+    if settings.search_keyword_extraction == "llm" and provider != SearchProvider.DUCKDUCKGO:
+        search_query = await generate_search_query(content)
+    else:
+        search_query = content
     search_result = await perform_web_search(
         search_query,
         settings.search_result_count,
@@ -415,7 +420,12 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
 
-                search_query = await generate_search_query(body.content)
+                # Use LLM query generation only when explicitly selected and not using DuckDuckGo
+                # (DDG has built-in query optimization; no need to pre-process)
+                if settings.search_keyword_extraction == "llm" and provider != SearchProvider.DUCKDUCKGO:
+                    search_query = await generate_search_query(body.content)
+                else:
+                    search_query = body.content
 
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
@@ -1025,10 +1035,10 @@ async def update_app_settings(request: UpdateSettingsRequest):
             )
 
     if request.search_keyword_extraction is not None:
-        if request.search_keyword_extraction not in ["direct", "yake"]:
+        if request.search_keyword_extraction not in ["direct", "yake", "llm"]:
              raise HTTPException(
                 status_code=400,
-                detail="Invalid keyword extraction mode. Must be 'direct' or 'yake'"
+                detail="Invalid keyword extraction mode. Must be 'direct', 'yake', or 'llm'"
             )
         updates["search_keyword_extraction"] = request.search_keyword_extraction
 

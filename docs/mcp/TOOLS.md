@@ -120,6 +120,12 @@ Manage council configuration and presets.
 | `stage2_temperature` | float | `update` | Stage 2 heat |
 | `execution_mode` | string | `update` | `full`, `chat_ranking`, or `chat_only` |
 | `stage1_prompt`, `stage2_prompt`, `stage3_prompt` | string | `update` | Custom system prompts |
+| `title_prompt`, `query_prompt` | string | `update` | Title generation and LLM search query reformulation prompts |
+| `search_provider` | string | `update` | `duckduckgo`, `tavily`, `brave`, `serper`, `tinyfish` |
+| `search_keyword_extraction` | string | `update` | Query processing: `direct` (default), `yake`, or `llm` |
+| `search_result_count` | integer | `update` | Number of results to fetch (5–15, default 8) |
+| `search_hybrid_mode` | boolean | `update` | DuckDuckGo: combine web + news (default `true`) |
+| `full_content_results` | integer | `update` | Jina Reader full-text fetch count (0–5, default 3; 0 = disabled) |
 | `enabled_providers` | object | `update` | Council-only provider toggles |
 | `direct_provider_toggles` | object | `update` | Per-direct-provider council toggles |
 | `preset_id` | string | `save_preset`, `delete_preset`, `set_default_preset` | Preset UUID |
@@ -216,7 +222,15 @@ If settings fetch fails while backend is up: includes `"settings_error": "..."`.
 
 **`set_search` valid providers:** `duckduckgo`, `tavily`, `brave`, `serper`, `tinyfish`.
 
-**`set_api_key` valid providers:** `openrouter`, `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`, `tinyfish`, `tavily`, `brave`, `serper`.
+**`set_search` query processing mode** — set `search_keyword_extraction` via `council_settings` `update`:
+
+| Value | Behaviour |
+|-------|-----------|
+| `"direct"` | Send exact query to search engine (default) |
+| `"yake"` | Extract key terms with YAKE before searching |
+| `"llm"` | Chairman model reformulates the query (skipped for DuckDuckGo) |
+
+**`set_api_key` valid providers:** `openrouter`, `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`, `nvidia`, `tinyfish`, `tavily`, `brave`, `serper`.
 
 ---
 

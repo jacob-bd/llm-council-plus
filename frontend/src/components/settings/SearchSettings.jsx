@@ -328,53 +328,74 @@ export default function SearchSettings({
                 </div>
             )}
 
-            {/* Search Query Processing - only show for Tavily/Brave since DuckDuckGo has built-in optimization */}
-            {selectedSearchProvider !== 'duckduckgo' && (
-                <div className="keyword-extraction-section" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <label>Search Query Processing</label>
-                    <p className="setting-description">
-                        Choose how your prompt is sent to the search engine.
-                    </p>
+            {/* Search Query Processing */}
+            <div className="keyword-extraction-section" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                <label>Search Query Processing</label>
+                <p className="setting-description">
+                    Choose how your prompt is sent to the search engine.
+                    {selectedSearchProvider === 'duckduckgo' && (
+                        <span style={{ display: 'block', marginTop: '4px', color: 'var(--text-tertiary)', fontSize: '12px' }}>
+                            ℹ️ DuckDuckGo uses built-in query optimization. Direct mode is recommended.
+                        </span>
+                    )}
+                </p>
 
-                    <div className="provider-options">
-                        <div className={`provider-option-container ${searchKeywordExtraction === 'direct' ? 'selected' : ''}`}>
-                            <label className="provider-option">
-                                <input
-                                    type="radio"
-                                    name="keyword_extraction"
-                                    value="direct"
-                                    checked={searchKeywordExtraction === 'direct'}
-                                    onChange={() => setSearchKeywordExtraction('direct')}
-                                />
-                                <div className="provider-info">
-                                    <span className="provider-name">Direct (Recommended)</span>
-                                    <span className="provider-description">
-                                        Send your exact query to the search engine. Best for modern semantic search engines like Tavily and Brave.
-                                    </span>
-                                </div>
-                            </label>
-                        </div>
+                <div className="provider-options">
+                    <div className={`provider-option-container ${searchKeywordExtraction === 'direct' ? 'selected' : ''}`}>
+                        <label className="provider-option">
+                            <input
+                                type="radio"
+                                name="keyword_extraction"
+                                value="direct"
+                                checked={searchKeywordExtraction === 'direct'}
+                                onChange={() => setSearchKeywordExtraction('direct')}
+                            />
+                            <div className="provider-info">
+                                <span className="provider-name">Direct (Recommended)</span>
+                                <span className="provider-description">
+                                    Send your exact query to the search engine. Best for most providers.
+                                </span>
+                            </div>
+                        </label>
+                    </div>
 
-                        <div className={`provider-option-container ${searchKeywordExtraction === 'yake' ? 'selected' : ''}`}>
-                            <label className="provider-option">
-                                <input
-                                    type="radio"
-                                    name="keyword_extraction"
-                                    value="yake"
-                                    checked={searchKeywordExtraction === 'yake'}
-                                    onChange={() => setSearchKeywordExtraction('yake')}
-                                />
-                                <div className="provider-info">
-                                    <span className="provider-name">Smart Keywords (Yake)</span>
-                                    <span className="provider-description">
-                                        Extract key terms from your prompt before searching. Useful if you paste very long prompts that confuse the search engine.
-                                    </span>
-                                </div>
-                            </label>
-                        </div>
+                    <div className={`provider-option-container ${searchKeywordExtraction === 'yake' ? 'selected' : ''}`}>
+                        <label className="provider-option">
+                            <input
+                                type="radio"
+                                name="keyword_extraction"
+                                value="yake"
+                                checked={searchKeywordExtraction === 'yake'}
+                                onChange={() => setSearchKeywordExtraction('yake')}
+                            />
+                            <div className="provider-info">
+                                <span className="provider-name">Smart Keywords (YAKE)</span>
+                                <span className="provider-description">
+                                    Extract key terms from your prompt before searching. Useful if you paste very long prompts that confuse the search engine.
+                                </span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div className={`provider-option-container ${searchKeywordExtraction === 'llm' ? 'selected' : ''}`}>
+                        <label className="provider-option">
+                            <input
+                                type="radio"
+                                name="keyword_extraction"
+                                value="llm"
+                                checked={searchKeywordExtraction === 'llm'}
+                                onChange={() => setSearchKeywordExtraction('llm')}
+                            />
+                            <div className="provider-info">
+                                <span className="provider-name">LLM Reformulation</span>
+                                <span className="provider-description">
+                                    Use the Chairman model to rephrase your query into an optimal search term. Slower but can improve results for complex questions.
+                                </span>
+                            </div>
+                        </label>
                     </div>
                 </div>
-            )}
+            </div>
         </section>
     );
 }

@@ -60,7 +60,7 @@ export default function Sidebar({
         <div className="sidebar-header">
         <div className="sidebar-title-wrapper">
           <div className="sidebar-title">LLM Council <span className="title-plus">Plus</span></div>
-          <div className="sidebar-subtitle">Created by: Jacob Ben-David</div>
+          <div className="sidebar-subtitle">Created by: <a href="https://github.com/jacob-bd" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', borderBottom: '1px dotted rgba(255,255,255,0.3)', paddingBottom: '1px', transition: 'border-color 0.2s' }} onMouseEnter={e => e.target.style.borderBottomColor = 'rgba(255,255,255,0.7)'} onMouseLeave={e => e.target.style.borderBottomColor = 'rgba(255,255,255,0.3)'}>Jacob Ben-David</a></div>
           <div className="sidebar-version">v0.6.0</div>
         </div>
         <button

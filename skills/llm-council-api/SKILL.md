@@ -421,9 +421,17 @@ All fields are optional — only provided fields are updated. Requires minimum 1
 - `"chat_ranking"` — stages 1+2 (no chairman synthesis)
 - `"chat_only"` — stage 1 only (fastest, individual responses)
 
+**Temperature fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `council_temperature` | `0.5` | Stage 1 creativity (higher = more varied individual responses) |
+| `chairman_temperature` | `0.4` | Stage 3 synthesis creativity |
+| `stage2_temperature` | `0.3` | Stage 2 ranking consistency (lower = more deterministic) |
+
 ---
 
-### 10. Configure System Prompts and Provider Toggles
+### 10. Configure System Prompts, Search Tuning, and Provider Toggles
 
 ```bash
 curl -X PUT http://localhost:8001/api/settings \
@@ -431,23 +439,35 @@ curl -X PUT http://localhost:8001/api/settings \
   -d '{
     "stage1_prompt": "You are an expert analyst. Answer with evidence and cite sources.",
     "stage2_prompt": "Rank the responses below by accuracy and depth.",
-    "stage3_prompt": "Synthesize the best elements from all responses into a definitive answer."
-  }'
-
-curl -X PUT http://localhost:8001/api/settings \
-  -H "Content-Type: application/json" \
-  -d '{
+    "stage3_prompt": "Synthesize the best elements from all responses into a definitive answer.",
     "enabled_providers": {"openrouter": true, "ollama": false, "groq": true, "direct": false},
-    "direct_provider_toggles": {"openai": true, "anthropic": true, "google": false}
+    "direct_provider_toggles": {"openai": true, "anthropic": true, "google": false, "nvidia": true}
   }'
 ```
+
+**Editable system prompt fields:**
+
+| Field | Description |
+|-------|-------------|
+| `stage1_prompt` | System prompt for Stage 1 individual model responses |
+| `stage2_prompt` | System prompt for Stage 2 peer ranking |
+| `stage3_prompt` | System prompt for Stage 3 chairman synthesis |
+| `title_prompt` | Prompt used to generate conversation titles |
+| `query_prompt` | Prompt used to reformulate user query for web search (LLM mode) |
+
+**Search tuning fields:**
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `search_result_count` | `8` | Number of web search results to retrieve (5–15) |
+| `search_hybrid_mode` | `true` | DuckDuckGo: combine web + news results for better current-events coverage |
+| `full_content_results` | `3` | How many top results to fetch full article text via Jina Reader (0 = disabled) |
 
 **`enabled_providers` keys:** `openrouter`, `ollama`, `groq`, `direct` (master toggle for all direct), `custom`
 
 **Note:** These toggles filter model lists in **Settings → Council Config** only. They do **not** restrict Advisor Setup model pickers (advisors use all configured providers).
 
-**`direct_provider_toggles` keys:** `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`, `nvidia`  
-**`direct_provider_toggles` keys:** `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`
+**`direct_provider_toggles` keys:** `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`, `nvidia`
 
 ---
 
@@ -468,6 +488,7 @@ curl -X PUT http://localhost:8001/api/settings \
 | Mistral | `mistral_api_key` |
 | DeepSeek | `deepseek_api_key` |
 | Groq | `groq_api_key` |
+| Nvidia | `nvidia_api_key` |
 | TinyFish | `tinyfish_api_key` |
 | Tavily | `tavily_api_key` |
 | Brave | `brave_api_key` |
@@ -742,6 +763,16 @@ curl -X PUT http://localhost:8001/api/settings \
 | `advisor_default_rounds` | `3` | Default number of debate rounds (3–10) |
 | `advisor_presets` | `[]` | Saved advisor setups (personas, model mode, models, optional rounds/search). Max 20 presets. Each preset: `{ id, name, persona_ids, mode, default_model, tiebreaker_model, model_assignments, max_rounds, search_provider, is_default, last_used_at }` |
 
+**Advisor prompt customization fields** (all reset-to-default via `POST /api/settings/reset`):
+
+| Field | Description |
+|-------|-------------|
+| `advisor_round1_prompt` | System prompt for the first debate round |
+| `advisor_followup_prompt` | System prompt for subsequent follow-up rounds |
+| `advisor_cross_pollination_prompt` | Prompt for synthesizing prior round context into follow-ups |
+| `advisor_verdict_prompt` | Prompt for the final verdict / summary model |
+| `advisor_tiebreaker_prompt` | Prompt for the tiebreaker model (2-persona deadlock) |
+
 **Save or update presets via REST:**
 
 ```bash
@@ -957,6 +988,24 @@ curl -X PUT http://localhost:8001/api/settings \
 # Valid providers: duckduckgo, tavily, brave, serper, tinyfish
 # duckduckgo requires no key; all others require an API key
 ```
+
+### Search Query Processing Mode
+
+Control how your prompt is sent to the search engine via `search_keyword_extraction`:
+
+```bash
+curl -X PUT http://localhost:8001/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"search_keyword_extraction": "direct"}'
+```
+
+| Value | Behaviour |
+|-------|-----------|
+| `"direct"` | Send the exact user query to the search engine (default, recommended) |
+| `"yake"` | Extract key terms with YAKE before searching — useful for very long prompts |
+| `"llm"` | Use the Chairman model to reformulate the query into an optimal search term — slower but can improve results for complex questions |
+
+> **DuckDuckGo note:** DDG applies its own built-in query optimisation internally. `"direct"` is recommended when using DuckDuckGo; `"llm"` is skipped for DDG even if selected.
 
 ---
 
