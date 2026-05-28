@@ -10,13 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - _(none)_
 
+## [0.6.0] - 2026-05-28
+
+### Added
+- **API Key & Model Count Feedback**: Settings panel now queries and displays model counts (e.g. `✓ API key configured · 44 models available`) for OpenRouter, Groq, direct providers, and Ollama in real-time.
+
+### Fixed
+- **CORS LAN Access**: Expanded dev CORS regex to allow local network IP connections (e.g., `192.168.x.x`), resolving blank screen settings page loading issues when accessed remotely.
+- **Auto-Scrolling in Chat**: Fixed chat scroll positioning during active response generation to instantly scroll to bottom.
+- **Conversation Title Overwrite**: Fixed a race condition where council-mode conversation titles were overwritten back to `"New Conversation"` during final assistant message save.
+- **Chairman Display Mode Logic**: Fixed the Chairman card showing up in the UI for messages executed in `chat_only` mode by linking the grid layout to the message's specific metadata execution mode rather than the current UI state.
+
 ## [0.5.2] - 2026-05-27
 
 ### Added
 - **Inline council setup**: Edit council members and chairman on the welcome screen (landing + empty conversation) with auto-save, compact member list (+ Add up to 8), live grid preview, and **council presets** (members + chairman only; default auto-loads).
+- **Interactive Council Grid**: Introduced `EditableCouncilGrid` supporting inline slot editing, adding member models up to 8, and quick-swapping models directly on the landing screen.
 - **Advisor model presets**: Save and load named advisor setups (selected personas, Simple/Advanced model assignment, optional rounds and web search) from the Model Assignment section in Advisor Setup. Presets persist in `settings.json` via `advisor_presets`.
 - **Documentation sync checklist**: [`docs/DOC-SYNC.md`](docs/DOC-SYNC.md) — required file matrix for keeping REST API, MCP tools, skill, and user docs aligned on every change.
 - **MCP preset CRUD**: `council_settings` and `advisor_settings` now support `list_presets`, `save_preset`, `delete_preset`, and `set_default_preset` actions.
+- **Presets & parsing unit tests**: Added comprehensive backend test suites (`test_advisor_presets.py`, `test_council_presets.py`, `test_ranking_parse.py`) and updated MCP integration tests to verify consolidated 9-tool behavior.
 
 ### Changed
 - **MCP tool consolidation (breaking)**: Replaced 25 single-purpose MCP tools with **9 action-based tools** — `council_deliberate`, `model_chat`, `advisor_debate`, `council_settings`, `advisor_settings`, `personas`, `conversations`, `providers`, `config_backup`. Legacy names (`run_deliberation`, `get_council_config`, `check_health`, etc.) removed.
@@ -27,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Chairman validation**: Chairman required only for **Full Deliberation**; Chat Only and Chat + Ranking no longer block send without a chairman.
 - **Stream API**: Frontend sends `council_models` / `chairman_model` on message stream so the run matches the on-screen lineup.
 - **MCP docs sync**: All docs and `skills/llm-council-api/SKILL.md` updated for **9-tool** MCP catalog; `/api/health` reports `tools: 9`.
+
+### Fixed
+- **Stage 2 peer ranking parsing**: Hardened text parser to validate that parsed rankings only include labels actually presented in the prompt, preventing models from hallucinating non-existent labels.
+- **Model labeling fixes**: Fixed a bug where anonymous models were incorrectly mapped/labeled during Stage 2 aggregation.
+- **Production build crash**: Fixed circular dependency initialization crash in the production bundle by removing rollup `manualChunks`.
+- **Direct installation layout lockups**: Standardized `--prefix frontend` usage for all install instructions to avoid nested directory lockups when switching between environments.
 
 ### Removed
 - **25 legacy MCP tools** — see migration table in `docs/mcp/INSTRUCTIONS.md`.

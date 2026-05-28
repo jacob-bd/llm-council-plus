@@ -1,6 +1,6 @@
 [project]
 name = "llm-council-plus"
-version = "0.4.0"
+version = "0.6.0"
 description = "LLM Council Plus - Your Advanced AI Council"
 readme = "README.md"
 requires-python = ">=3.10"
