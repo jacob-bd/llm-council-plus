@@ -11,7 +11,7 @@ def server():
     return create_server(base_url="http://test:8001")
 
 
-from llm_council_mcp.tests.conftest import get_text
+from llm_council_mcp.tests.conftest import get_text, get_json
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_list_models_returns_model_info(server):
         respx.get("http://test:8001/api/custom-endpoint/models").mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        result = await server.call_tool("list_models", {})
+        result = await server.call_tool("providers", {"action": "list_models"})
         text = get_text(result)
         assert "GPT-4.1" in text
         assert "OpenRouter" in text
@@ -65,7 +65,7 @@ async def test_list_models_free_flag(server):
         respx.get("http://test:8001/api/custom-endpoint/models").mock(
             return_value=httpx.Response(200, json={"models": []})
         )
-        result = await server.call_tool("list_models", {})
+        result = await server.call_tool("providers", {"action": "list_models"})
         text = get_text(result)
         assert "(free)" in text
 
@@ -80,7 +80,7 @@ async def test_list_models_empty(server):
             "http://test:8001/api/custom-endpoint/models",
         ]:
             respx.get(url).mock(return_value=httpx.Response(200, json={"models": []}))
-        result = await server.call_tool("list_models", {})
+        result = await server.call_tool("providers", {"action": "list_models"})
         text = get_text(result)
         assert "No models available" in text
 
@@ -99,44 +99,46 @@ async def test_get_council_config(server):
                 "search_provider": "duckduckgo",
             })
         )
-        result = await server.call_tool("get_council_config", {})
+        result = await server.call_tool("council_settings", {"action": "get"})
         text = get_text(result)
         assert "council_models" in text
         assert "chairman_model" in text
         assert "openai:gpt-4.1" in text
         assert "anthropic:claude-sonnet-4" in text
         assert "duckduckgo" in text
+        data = get_json(result)
+        assert "council_presets" in data
 
 
 @pytest.mark.asyncio
 async def test_configure_council_too_few_models(server):
-    result = await server.call_tool("configure_council", {"models": ["openai:gpt-4.1"]})
+    result = await server.call_tool("council_settings", {"action": "update", "models": []})
     text = get_text(result)
     assert "Error" in text
-    assert "2-8" in text
+    assert "1-8" in text
 
 
 @pytest.mark.asyncio
 async def test_configure_council_too_many_models(server):
     models = [f"openai:model-{i}" for i in range(9)]
-    result = await server.call_tool("configure_council", {"models": models})
+    result = await server.call_tool("council_settings", {"action": "update", "models": models})
     text = get_text(result)
     assert "Error" in text
-    assert "2-8" in text
+    assert "1-8" in text
 
 
 @pytest.mark.asyncio
 async def test_configure_council_invalid_mode(server):
-    result = await server.call_tool("configure_council", {"execution_mode": "invalid"})
+    result = await server.call_tool("council_settings", {"action": "update", "execution_mode": "invalid"})
     text = get_text(result)
     assert "Error" in text
 
 
 @pytest.mark.asyncio
 async def test_configure_council_no_args(server):
-    result = await server.call_tool("configure_council", {})
+    result = await server.call_tool("council_settings", {"action": "update"})
     text = get_text(result)
-    assert "No changes requested" in text
+    assert "no update fields" in text
 
 
 @pytest.mark.asyncio
@@ -145,15 +147,15 @@ async def test_configure_council_success(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("configure_council", {
+        result = await server.call_tool("council_settings", {"action": "update", 
             "models": ["openai:gpt-4.1", "anthropic:claude-sonnet-4"],
             "chairman": "anthropic:claude-opus-4",
             "execution_mode": "full",
         })
-        text = get_text(result)
-        assert "Council updated successfully" in text
-        assert "openai:gpt-4.1" in text
-        assert "full" in text
+        data = get_json(result)
+        assert data["status"] == "updated"
+        assert "council_models" in data["fields"]
+        assert "execution_mode" in data["fields"]
 
 
 @pytest.mark.asyncio
@@ -162,17 +164,17 @@ async def test_configure_council_temperatures_only(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("configure_council", {
+        result = await server.call_tool("council_settings", {"action": "update", 
             "council_temperature": 0.7,
             "chairman_temperature": 0.3,
         })
-        text = get_text(result)
-        assert "Council updated successfully" in text
+        data = get_json(result)
+        assert data["status"] == "updated"
 
 
 @pytest.mark.asyncio
 async def test_set_search_provider_invalid(server):
-    result = await server.call_tool("set_search_provider", {"provider": "notreal"})
+    result = await server.call_tool("providers", {"action": "set_search", "provider": "notreal"})
     text = get_text(result)
     assert "Error" in text
     assert "notreal" in text
@@ -184,7 +186,7 @@ async def test_set_search_provider_duckduckgo(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("set_search_provider", {"provider": "duckduckgo"})
+        result = await server.call_tool("providers", {"action": "set_search", "provider": "duckduckgo"})
         text = get_text(result)
         assert "duckduckgo" in text
         assert "Error" not in text
@@ -196,7 +198,7 @@ async def test_set_search_provider_tinyfish_with_key(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("set_search_provider", {
+        result = await server.call_tool("providers", {"action": "set_search", 
             "provider": "tinyfish",
             "api_key": "tf-key-abc123",
         })
@@ -214,7 +216,7 @@ async def test_set_search_provider_valid_options(server):
             respx.put("http://test:8001/api/settings").mock(
                 return_value=httpx.Response(200, json={"success": True})
             )
-            result = await server.call_tool("set_search_provider", {"provider": provider})
+            result = await server.call_tool("providers", {"action": "set_search", "provider": provider})
             text = get_text(result)
             assert "Error" not in text, f"Provider '{provider}' should be valid but got: {text}"
 
@@ -227,11 +229,11 @@ async def test_configure_council_with_stage1_prompt(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("configure_council", {
+        result = await server.call_tool("council_settings", {"action": "update", 
             "stage1_prompt": "You are a helpful expert council member.",
         })
-        text = get_text(result)
-        assert "Council updated successfully" in text
+        data = get_json(result)
+        assert data["status"] == "updated"
 
 
 @pytest.mark.asyncio
@@ -240,11 +242,11 @@ async def test_configure_council_with_enabled_providers(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("configure_council", {
+        result = await server.call_tool("council_settings", {"action": "update", 
             "enabled_providers": {"openrouter": True, "ollama": False},
         })
-        text = get_text(result)
-        assert "Council updated successfully" in text
+        data = get_json(result)
+        assert data["status"] == "updated"
 
 
 # ── set_api_key tests ────────────────────────────────────────────────────────
@@ -255,7 +257,7 @@ async def test_set_api_key_valid_provider(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        result = await server.call_tool("set_api_key", {
+        result = await server.call_tool("providers", {"action": "set_api_key", 
             "provider": "openai",
             "api_key": "sk-test-key",
         })
@@ -266,7 +268,7 @@ async def test_set_api_key_valid_provider(server):
 
 @pytest.mark.asyncio
 async def test_set_api_key_invalid_provider(server):
-    result = await server.call_tool("set_api_key", {"provider": "notreal", "api_key": "x"})
+    result = await server.call_tool("providers", {"action": "set_api_key", "provider": "notreal", "api_key": "x"})
     text = get_text(result)
     assert "Error" in text
     assert "notreal" in text
@@ -283,7 +285,7 @@ async def test_export_config(server):
                 "openai_api_key": "sk-real-key",
             })
         )
-        result = await server.call_tool("export_config", {})
+        result = await server.call_tool("config_backup", {"action": "export"})
         text = get_text(result)
         assert "council_models" in text
         assert "openai_api_key" in text
@@ -299,14 +301,14 @@ async def test_import_config_valid(server):
             return_value=httpx.Response(200, json={"status": "imported"})
         )
         config = json.dumps({"council_models": ["openai:gpt-4.1", "anthropic:claude-sonnet-4"]})
-        result = await server.call_tool("import_config", {"config_json": config})
+        result = await server.call_tool("config_backup", {"action": "import", "config_json": config})
         text = get_text(result)
         assert "imported" in text.lower()
 
 
 @pytest.mark.asyncio
 async def test_import_config_invalid_json(server):
-    result = await server.call_tool("import_config", {"config_json": "not-json{"})
+    result = await server.call_tool("config_backup", {"action": "import", "config_json": "not-json{"})
     text = get_text(result)
     assert "Error" in text
 
@@ -319,6 +321,6 @@ async def test_reset_config(server):
         respx.post("http://test:8001/api/settings/reset").mock(
             return_value=httpx.Response(200, json={"status": "reset"})
         )
-        result = await server.call_tool("reset_config", {})
+        result = await server.call_tool("config_backup", {"action": "reset"})
         text = get_text(result)
         assert "reset" in text.lower()

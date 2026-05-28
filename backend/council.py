@@ -246,9 +246,19 @@ async def stage2_collect_rankings(
             responses_text=responses_text,
             search_context_block=search_context_block
         )
+        valid_label_list = ", ".join(label_to_model.keys())
+        ranking_prompt += (
+            f"\n\nCRITICAL: Your FINAL RANKING must include ONLY these labels, "
+            f"each exactly once: {valid_label_list}. "
+            f"Do not invent or reference any other response labels."
+        )
     except (KeyError, AttributeError, TypeError) as e:
         logger.warning(f"Error formatting Stage 2 prompt: {e}. Using fallback.")
-        ranking_prompt = f"Question: {user_query}\n\n{responses_text}\n\nRank these responses."
+        valid_label_list = ", ".join(label_to_model.keys())
+        ranking_prompt = (
+            f"Question: {user_query}\n\n{responses_text}\n\n"
+            f"Rank these responses. FINAL RANKING must include ONLY: {valid_label_list}."
+        )
 
     messages = [{"role": "user", "content": ranking_prompt}]
 
@@ -306,7 +316,12 @@ async def stage2_collect_rankings(
                             
                             # Parse with expected count to avoid duplicates
                             expected_count = len(successful_results)
-                            parsed = parse_ranking_from_text(full_text, expected_count=expected_count)
+                            valid_labels = list(label_to_model.keys())
+                            parsed = parse_ranking_from_text(
+                                full_text,
+                                expected_count=expected_count,
+                                valid_labels=valid_labels,
+                            )
                             
                             result = {
                                 "model": model,
@@ -451,13 +466,18 @@ async def stage3_synthesize_final(
         }
 
 
-def parse_ranking_from_text(ranking_text: str, expected_count: int = None) -> List[str]:
+def parse_ranking_from_text(
+    ranking_text: str,
+    expected_count: int = None,
+    valid_labels: List[str] = None,
+) -> List[str]:
     """
     Parse the FINAL RANKING section from the model's response.
 
     Args:
         ranking_text: The full text response from the model
         expected_count: Optional number of expected ranked items (to truncate duplicates)
+        valid_labels: Optional allow-list of labels (e.g. Response A, Response B)
 
     Returns:
         List of response labels in ranked order
@@ -469,6 +489,7 @@ def parse_ranking_from_text(ranking_text: str, expected_count: int = None) -> Li
         ranking_text = str(ranking_text) if ranking_text is not None else ''
 
     matches = []
+    valid_set = set(valid_labels) if valid_labels else None
 
     # Look for "FINAL RANKING:" section
     if "FINAL RANKING:" in ranking_text:
@@ -489,6 +510,18 @@ def parse_ranking_from_text(ranking_text: str, expected_count: int = None) -> Li
     # If no matches found in section (or section missing), fallback to full text search
     if not matches:
         matches = re.findall(r'Response [A-Z]', ranking_text)
+
+    # Drop duplicates and labels outside the allow-list (e.g. hallucinated Response C)
+    seen = set()
+    filtered = []
+    for label in matches:
+        if label in seen:
+            continue
+        if valid_set is not None and label not in valid_set:
+            continue
+        seen.add(label)
+        filtered.append(label)
+    matches = filtered
 
     # Truncate if expected_count is provided
     if expected_count and len(matches) > expected_count:
@@ -521,7 +554,12 @@ def calculate_aggregate_rankings(
 
         # Parse the ranking from the structured format
         expected_count = len(label_to_model)
-        parsed_ranking = parse_ranking_from_text(ranking_text, expected_count=expected_count)
+        valid_labels = list(label_to_model.keys())
+        parsed_ranking = parse_ranking_from_text(
+            ranking_text,
+            expected_count=expected_count,
+            valid_labels=valid_labels,
+        )
 
         for position, label in enumerate(parsed_ranking, start=1):
             if label in label_to_model:

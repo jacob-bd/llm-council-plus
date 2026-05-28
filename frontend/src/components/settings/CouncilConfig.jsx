@@ -90,7 +90,8 @@ export default function CouncilConfig({
             <section className="settings-section">
                 <h3>Available Model Sources</h3>
                 <p className="section-description">
-                    Toggle which providers are available for the search generator, council members, and chairman.
+                    Toggle which providers are available for LLM Council only — the search generator, council members, and chairman.
+                    Advisor debates always use every provider you configure under LLM API Keys, regardless of these toggles.
                     <br /><em style={{ opacity: 0.7, fontSize: '12px' }}>Note: Non-chat models (embeddings, image generation, speech, OCR, etc.) are automatically filtered out.</em>
                 </p>
 
@@ -99,50 +100,65 @@ export default function CouncilConfig({
                     <div className="filter-group">
                         <label 
                             className={`toggle-wrapper ${!isSourceConfigured('openrouter') ? 'source-disabled' : ''}`}
-                            title={!isSourceConfigured('openrouter') ? 'SOURCE NOT CONFIGURED - Add API key in LLM API Keys' : ''}
+                            title={!isSourceConfigured('openrouter') ? 'Not configured — add API key in LLM API Keys' : ''}
                         >
                             <div className="toggle-switch">
                                 <input
                                     type="checkbox"
-                                    checked={enabledProviders.openrouter}
+                                    checked={isSourceConfigured('openrouter') && enabledProviders.openrouter}
                                     onChange={(e) => setEnabledProviders(prev => ({ ...prev, openrouter: e.target.checked }))}
                                     disabled={!isSourceConfigured('openrouter')}
                                 />
                                 <span className="slider"></span>
                             </div>
-                            <span className="toggle-text">OpenRouter (Cloud)</span>
+                            <span className="toggle-text">
+                                OpenRouter (Cloud)
+                                {!isSourceConfigured('openrouter') && (
+                                    <span className="toggle-hint"> · not configured</span>
+                                )}
+                            </span>
                         </label>
 
                         <label 
                             className={`toggle-wrapper ${!isSourceConfigured('ollama') ? 'source-disabled' : ''}`}
-                            title={!isSourceConfigured('ollama') ? 'SOURCE NOT CONFIGURED - Connect Ollama in LLM API Keys' : ''}
+                            title={!isSourceConfigured('ollama') ? 'Not configured — connect Ollama in LLM API Keys' : ''}
                         >
                             <div className="toggle-switch">
                                 <input
                                     type="checkbox"
-                                    checked={enabledProviders.ollama}
+                                    checked={isSourceConfigured('ollama') && enabledProviders.ollama}
                                     onChange={(e) => setEnabledProviders(prev => ({ ...prev, ollama: e.target.checked }))}
                                     disabled={!isSourceConfigured('ollama')}
                                 />
                                 <span className="slider"></span>
                             </div>
-                            <span className="toggle-text">Local (Ollama)</span>
+                            <span className="toggle-text">
+                                Local (Ollama)
+                                {!isSourceConfigured('ollama') && (
+                                    <span className="toggle-hint"> · not configured</span>
+                                )}
+                            </span>
                         </label>
 
                         <label 
                             className={`toggle-wrapper ${!isSourceConfigured('groq') ? 'source-disabled' : ''}`}
-                            title={!isSourceConfigured('groq') ? 'SOURCE NOT CONFIGURED - Add API key in LLM API Keys' : ''}
+                            title={!isSourceConfigured('groq') ? 'Not configured — add API key in LLM API Keys' : ''}
                         >
                             <div className="toggle-switch">
                                 <input
                                     type="checkbox"
-                                    checked={enabledProviders.groq}
+                                    checked={isSourceConfigured('groq') && enabledProviders.groq}
                                     onChange={(e) => setEnabledProviders(prev => ({ ...prev, groq: e.target.checked }))}
                                     disabled={!isSourceConfigured('groq')}
                                 />
                                 <span className="slider"></span>
                             </div>
-                            <span className="toggle-text">Groq (Fast Inference)</span>
+                            <span className="toggle-text">
+                                Groq (Fast Inference)
+                                {!isSourceConfigured('groq') && (
+                                    <span className="toggle-hint"> · not configured</span>
+                                )}
+                            </span>
                         </label>
 
                         {/* Custom Endpoint Toggle - only show if configured */}
@@ -205,7 +221,7 @@ export default function CouncilConfig({
                                     <div className="toggle-switch direct-toggle">
                                         <input
                                             type="checkbox"
-                                            checked={directProviderToggles[dp.id]}
+                                            checked={configured && directProviderToggles[dp.id]}
                                             disabled={!configured}
                                             onChange={(e) => {
                                                 const isEnabled = e.target.checked;

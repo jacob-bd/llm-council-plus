@@ -1,10 +1,10 @@
 ---
 name: llm-council-api
-version: 0.5.1
-description: Use when interacting with LLM Council Plus via HTTP API — configuring the council or advisors, running deliberations or persona debates, managing personas, or inspecting conversations — especially when the MCP server is unavailable, the SSE session is stale, or direct REST access is preferred. Triggers on requests like "ask the council", "run an advisor debate", "configure models", "list personas", "edit a persona", "run a deliberation", "check council health", or any manipulation of the LLM Council Plus system.
+version: 0.5.2
+description: LLM Council Plus — MCP-first (9 action-based tools) when the llm-council-plus MCP server is connected; REST/curl fallback when MCP is unavailable, for cron scripts, or raw SSE. Triggers on "ask the council", "run a debate", "configure models", "run a deliberation", "check council health", etc.
 ---
 
-# LLM Council Plus — HTTP API Skill
+# LLM Council Plus — API & MCP Skill
 
 ## Overview
 
@@ -13,18 +13,86 @@ LLM Council Plus has two operating modes:
 - **Council mode** — 3-stage multi-LLM deliberation: individual responses → anonymous peer ranking → chairman synthesis
 - **Advisor mode** — Named personas debate a question across configurable rounds, reaching consensus or delivering a structured verdict
 
-This skill lets you control both modes entirely via the REST API — no MCP required. Use it when MCP is unavailable, the SSE session is stale, or you prefer direct API access.
+**Transport rule (read first):** If LLM Council Plus **MCP tools are available** in your session, **call them** — do **not** shell out to `curl` for the same operation. This skill’s REST sections are the **fallback reference** when MCP is missing, the SSE session is stale, or you need raw SSE/admin export.
 
-**Default base URL:** `http://localhost:8001`  
+**MCP server (v0.5.2):** Built-in SSE at `http://localhost:8001/mcp/sse` (stdio: `python -m llm_council_mcp`). Exposes **9 action-based tools** (not 25). Verify via `GET /api/health` → `"mcp": {"tools": 9, "sse_url": "..."}`.
+
+**Default base URL (REST fallback only):** `http://localhost:8001`  
 **Remote server:** replace with `http://<server-ip>:8001`
 
 ---
 
-## Quick Reference
+## MCP-first routing
+
+### When to use MCP (preferred)
+
+Use MCP when your tool list includes any of these **9 tools** (server may appear as `llm-council-plus`, `llm-council`, or `user-llm-council-plus`):
+
+| You want to… | MCP tool | Action(s) | Do **not** use curl |
+|--------------|----------|-----------|---------------------|
+| Check server / providers | `providers` | `health` | ~~`GET /api/health`~~ |
+| Test an API key | `providers` | `test` | ~~`POST /api/settings/test-provider`~~ |
+| List models | `providers` | `list_models` | ~~`GET /api/models`…~~ |
+| Read council config (+ presets) | `council_settings` | `get` | ~~`GET /api/settings`~~ (council fields) |
+| Update council members/chairman/mode | `council_settings` | `update` | ~~`PUT /api/settings`~~ (council fields) |
+| Council preset CRUD | `council_settings` | `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | ~~`PUT /api/settings`~~ |
+| Set search provider / API key | `providers` | `set_search`, `set_api_key` | ~~`PUT /api/settings`~~ |
+| Backup / restore / reset config | `config_backup` | `export`, `import`, `reset` | ~~export/import/reset endpoints~~ |
+| Full deliberation | `council_deliberate` | `full` | ~~`/api/ask` or message stream~~ |
+| Stage 1 / 2 / 3 only | `council_deliberate` | `stage1`, `stage2`, `stage3` | ~~stage stream endpoints~~ |
+| One-shot model chat | `model_chat` | `quick` | ~~`POST /api/ask`~~ |
+| Multi-turn chat with a model | `model_chat` | `multi_turn` | ~~conversation message endpoints~~ |
+| List / read conversations | `conversations` | `list`, `get` | ~~conversation GETs~~ |
+| List / read / edit personas | `personas` | `list`, `get`, `update`, `reset` | ~~`/api/personas`~~ |
+| Read advisor defaults (+ presets) | `advisor_settings` | `get` | ~~`GET /api/settings`~~ (advisor fields) |
+| Update advisor defaults | `advisor_settings` | `update` | ~~`PUT /api/settings`~~ (advisor fields) |
+| Advisor preset CRUD | `advisor_settings` | `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | ~~`PUT /api/settings`~~ |
+| Run advisor debate | `advisor_debate` | _(direct params)_ | ~~`debate/stream`~~ |
+
+**Breaking change (v0.5.2):** Legacy 25-tool names (`run_deliberation`, `get_council_config`, `check_health`, etc.) were removed. Always use the 9 tools above with `action` parameters.
+
+## MCP Tool Catalog (9 tools)
+
+| Tool | Actions / usage |
+|------|-----------------|
+| `council_deliberate` | `stage1`, `stage2`, `stage3`, `full` |
+| `model_chat` | `quick`, `multi_turn` |
+| `advisor_debate` | Direct params: `question`, `persona_ids` (2–4), optional `max_rounds`, models |
+| `council_settings` | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` |
+| `advisor_settings` | Same preset actions + `get`, `update` |
+| `personas` | `list`, `get`, `update`, `reset` |
+| `conversations` | `list`, `get` |
+| `providers` | `list_models`, `health`, `test`, `set_api_key`, `set_search` |
+| `config_backup` | `export`, `import`, `reset` |
+
+In Claude Code, tools appear as `mcp__llm-council-plus__<name>` (server identifier may vary). Full parameters: [`docs/mcp/TOOLS.md`](../../docs/mcp/TOOLS.md).
+
+**Agent checklist before running curl:**
+
+1. Are MCP tools for this server visible in my tool list?
+2. Is there a row in the table above for this task?
+3. If **yes** to both → **call the MCP tool**. Only use REST if the MCP call fails or the task is in “REST only” below.
+
+### When to use REST (fallback)
+
+| Scenario | Why REST, not MCP |
+|----------|-------------------|
+| **Cron / CI / non-MCP scripts** | No MCP transport |
+| **MCP errors** (connection refused, stale SSE, tool not found) | Fallback per this skill |
+| **Raw SSE event parsing** (custom UIs) | MCP deliberation tools return consolidated results, not per-event SSE |
+| **Admin export with bearer token** | `GET /api/settings/export` — manual admin action |
+
+See [`docs/mcp/TOOLS.md`](../../docs/mcp/TOOLS.md) for MCP parameters and [`docs/mcp/EXAMPLES.md`](../../docs/mcp/EXAMPLES.md) for walkthroughs.
+
+---
+
+## Quick Reference (REST fallback)
+
+Use this table **only when MCP tools are unavailable** or the operation has no MCP equivalent (see routing above).
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Health check | GET | `/api/health` |
+| Health check | GET | `/api/health` (includes `"mcp": {"tools": 9}`) |
 | **One-shot query (no state)** | **POST** | **`/api/ask`** |
 | Get settings (council + advisor config) | GET | `/api/settings` |
 | Update settings | PUT | `/api/settings` |
@@ -74,9 +142,22 @@ groq:llama3-70b-8192                   → Groq fast inference
 
 ---
 
-## Examples
+## Provider & model availability
 
-### 1. One-Shot Query (Recommended for Scripts/MCPs)
+**Council vs Advisors use different rules:**
+
+| Mode | Which providers appear in model pickers |
+|------|----------------------------------------|
+| **LLM Council** (Settings → Council Config) | Sources enabled via `enabled_providers` and `direct_provider_toggles` |
+| **LLM Advisors** (Advisor Setup UI) | **All configured providers** — any provider with a saved API key, plus Ollama when `ollama_base_url` is set, plus custom endpoint when URL is configured. **Ignores** council `enabled_providers` toggles. |
+
+REST/MCP agents listing models should call the model list endpoints directly (`/api/models`, `/api/models/direct`, `/api/ollama/tags`, `/api/custom-endpoint/models`). Availability depends on credentials, not council toggles.
+
+---
+
+## Examples (REST fallback)
+
+### 1. One-Shot Query (scripts / REST-only environments)
 
 The simplest way to query a model. No conversation, no state, no cleanup.
 
@@ -161,7 +242,7 @@ No conversation management. No config mutation. One call.
 
 ---
 
-### 4. Streaming with Per-Request Overrides (for UIs/MCPs needing live progress)
+### 4. Streaming with Per-Request Overrides (REST-only — live SSE progress)
 
 When you need SSE events for real-time progress (stage1_progress, stage2_progress, etc.), use the streaming endpoint with per-request model overrides:
 
@@ -310,8 +391,12 @@ curl http://localhost:8001/api/settings | python3 -m json.tool
 Key fields returned:
 - `council_models` — list of model IDs in the council
 - `chairman_model` — model that synthesizes the final answer
-- `execution_mode` — `"full"` / `"chat_ranking"` / `"chat_only"`
+- `execution_mode` — `"full"` / `"chat_ranking"` / `"chat_only"` (persisted; omitted from some GET responses — use export for full blob)
 - `search_provider` — active search provider
+- `enabled_providers` — **council-only** toggles for Settings pickers (`openrouter`, `ollama`, `groq`, `direct`, `custom`)
+- `direct_provider_toggles` — per-direct-provider toggles for council Settings pickers
+- `advisor_presets` — saved advisor lineups (see §18)
+- `council_presets` — saved council lineups (members + chairman; see §18b)
 - `*_api_key_set` — boolean flags (never returns actual keys)
 - `custom_endpoint_name` / `custom_endpoint_url` — custom provider details
 
@@ -357,7 +442,11 @@ curl -X PUT http://localhost:8001/api/settings \
   }'
 ```
 
-**`enabled_providers` keys:** `openrouter`, `ollama`, `groq`, `direct` (master toggle for all direct), `custom`  
+**`enabled_providers` keys:** `openrouter`, `ollama`, `groq`, `direct` (master toggle for all direct), `custom`
+
+**Note:** These toggles filter model lists in **Settings → Council Config** only. They do **not** restrict Advisor Setup model pickers (advisors use all configured providers).
+
+**`direct_provider_toggles` keys:** `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`, `nvidia`  
 **`direct_provider_toggles` keys:** `openai`, `anthropic`, `google`, `mistral`, `deepseek`, `groq`
 
 ---
@@ -651,6 +740,63 @@ curl -X PUT http://localhost:8001/api/settings \
 | `advisor_tiebreaker_model` | `""` | Model for tiebreaker + verdict synthesis (falls back to `advisor_default_model`) |
 | `advisor_temperature` | `0.7` | LLM temperature for advisor calls |
 | `advisor_default_rounds` | `3` | Default number of debate rounds (3–10) |
+| `advisor_presets` | `[]` | Saved advisor setups (personas, model mode, models, optional rounds/search). Max 20 presets. Each preset: `{ id, name, persona_ids, mode, default_model, tiebreaker_model, model_assignments, max_rounds, search_provider, is_default, last_used_at }` |
+
+**Save or update presets via REST:**
+
+```bash
+curl -X PUT http://localhost:8001/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "advisor_presets": [
+      {
+        "id": "preset-uuid-here",
+        "name": "Startup Panel",
+        "persona_ids": ["skeptic", "pragmatist", "innovator"],
+        "mode": "simple",
+        "default_model": "openai:gpt-4.1",
+        "tiebreaker_model": "openai:gpt-4.1",
+        "model_assignments": null,
+        "max_rounds": 3,
+        "search_provider": null,
+        "is_default": true,
+        "last_used_at": null
+      }
+    ]
+  }'
+```
+
+MCP: `advisor_settings` action `get` returns `advisor_presets`. Preset CRUD: `advisor_settings` actions `list_presets`, `save_preset`, `delete_preset`, `set_default_preset`.
+
+---
+
+### 18b. Council Presets (`council_presets`)
+
+Saved from welcome-screen **Council Setup** — council members + chairman only (not execution mode). Max 20 presets; one `is_default` auto-loads on open.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `council_presets` | `[]` | Each preset: `{ id, name, council_models, chairman_model, is_default, last_used_at }` |
+
+```bash
+curl -X PUT http://localhost:8001/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "council_presets": [
+      {
+        "id": "preset-uuid",
+        "name": "Coding Council",
+        "council_models": ["openai:gpt-4.1", "anthropic:claude-3.5-sonnet"],
+        "chairman_model": "openai:gpt-4.1",
+        "is_default": true
+      }
+    ]
+  }'
+```
+
+MCP: `council_settings` action `get` returns `council_presets`. Preset CRUD: `council_settings` actions `list_presets`, `save_preset`, `delete_preset`, `set_default_preset`.
+
+**UI behavior:** Main-screen editor auto-saves `council_models` / `chairman_model` on each change. Lineup is read-only in a conversation after the first message. Settings remains the place for temperatures, prompts, and provider toggles.
 
 ---
 

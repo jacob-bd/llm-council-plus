@@ -1,9 +1,107 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { api, buildAvailableSearchProviders } from '../api';
 import SearchableModelSelect from './SearchableModelSelect';
+import { getShortModelName } from '../utils/modelHelpers';
 import './AdvisorSetup.css';
 
 const RECOMMENDED_PERSONA_IDS = ['skeptic', 'pragmatist', 'innovator'];
+const MIN_ROUNDS = 3;
+const MAX_ROUNDS = 10;
+const MAX_PRESETS = 20;
+
+function clampRounds(value, fallback = MIN_ROUNDS) {
+  const rounds = typeof value === 'number' ? value : fallback;
+  return Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, rounds));
+}
+
+function normalizePresetMode(mode) {
+  return mode === 'advanced' ? 'advanced' : 'simple';
+}
+
+function buildPresetSnapshot({
+  selectedPersonaIds,
+  modelMode,
+  chosenModel,
+  tiebreakerModel,
+  modelAssignments,
+  rounds,
+  searchProvider,
+}) {
+  const sortedPersonaIds = [...selectedPersonaIds].sort();
+  const assignments =
+    modelMode === 'advanced'
+      ? Object.fromEntries(
+          sortedPersonaIds
+            .filter((id) => modelAssignments[id])
+            .sort()
+            .map((id) => [id, modelAssignments[id]])
+        )
+      : null;
+
+  return {
+    persona_ids: sortedPersonaIds,
+    mode: modelMode,
+    default_model: chosenModel || '',
+    tiebreaker_model: tiebreakerModel || '',
+    model_assignments: assignments && Object.keys(assignments).length > 0 ? assignments : null,
+    max_rounds: rounds,
+    search_provider: searchProvider,
+  };
+}
+
+function snapshotsEqual(a, b) {
+  if (!a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function newPresetId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `preset-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function hasAnyDirectProviderKey(settings) {
+  return !!(
+    settings.openai_api_key_set
+    || settings.anthropic_api_key_set
+    || settings.google_api_key_set
+    || settings.mistral_api_key_set
+    || settings.deepseek_api_key_set
+    || settings.groq_api_key_set
+    || settings.nvidia_api_key_set
+  );
+}
+
+const DIRECT_PROVIDER_KEY_FLAGS = {
+  openai: 'openai_api_key_set',
+  anthropic: 'anthropic_api_key_set',
+  google: 'google_api_key_set',
+  mistral: 'mistral_api_key_set',
+  deepseek: 'deepseek_api_key_set',
+  groq: 'groq_api_key_set',
+  nvidia: 'nvidia_api_key_set',
+};
+
+/** Advisor setup shows models for configured providers, not only council toggles. */
+function filterDirectModelsForAdvisor(directModels, settings) {
+  return directModels.filter((model) => {
+    if (model.provider === 'Groq') return settings.groq_api_key_set;
+    const providerKey = (model.provider || '').toLowerCase();
+    const flag = DIRECT_PROVIDER_KEY_FLAGS[providerKey];
+    return flag ? settings[flag] : false;
+  });
+}
+
+/** Advisors use every configured provider — independent of Council Config toggles. */
+function getAdvisorModelSources(settings) {
+  return {
+    openrouter: !!settings.openrouter_api_key_set,
+    ollama: !!settings.ollama_base_url,
+    direct: hasAnyDirectProviderKey(settings),
+    custom: !!settings.custom_endpoint_url,
+  };
+}
 
 export default function AdvisorSetup({
   onStartDebate,
@@ -28,16 +126,34 @@ export default function AdvisorSetup({
   const searchPopoverRef = useRef(null);
   const [question, setQuestion] = useState('');
   const [personasExpanded, setPersonasExpanded] = useState(true);
+  const [presets, setPresets] = useState([]);
+  const [activePresetId, setActivePresetId] = useState(null);
+  const [presetPopoverOpen, setPresetPopoverOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveForm, setSaveForm] = useState({
+    name: '',
+    isDefault: false,
+    includeConfig: true,
+    updateExisting: true,
+  });
+  const [presetSaving, setPresetSaving] = useState(false);
+  const presetPopoverRef = useRef(null);
+  const loadedSnapshotRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchPopoverRef.current && !searchPopoverRef.current.contains(e.target)) {
         setSearchPopoverOpen(false);
       }
+      if (presetPopoverRef.current && !presetPopoverRef.current.contains(e.target)) {
+        setPresetPopoverOpen(false);
+      }
     };
-    if (searchPopoverOpen) document.addEventListener('mousedown', handleClickOutside);
+    if (searchPopoverOpen || presetPopoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [searchPopoverOpen]);
+  }, [searchPopoverOpen, presetPopoverOpen]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -50,14 +166,14 @@ export default function AdvisorSetup({
 
         setAvailableSearchProviders(buildAvailableSearchProviders(settings));
 
-        const enabled = settings.enabled_providers || {};
+        const loadSources = getAdvisorModelSources(settings);
         const ollamaUrl = settings.ollama_base_url || 'http://localhost:11434';
 
         const [orModels, ollamaModels, directModels, customModels] = await Promise.all([
-          enabled.openrouter
+          loadSources.openrouter
             ? api.getModels().then(d => d.models || []).catch(() => [])
             : [],
-          enabled.ollama
+          loadSources.ollama
             ? api.getOllamaModels(ollamaUrl).then(d => (d.models || []).map(m => ({
                 ...m,
                 id: m.id.startsWith('ollama:') ? m.id : `ollama:${m.id}`,
@@ -65,10 +181,12 @@ export default function AdvisorSetup({
                 provider: 'Ollama',
               }))).catch(() => [])
             : [],
-          (enabled.groq || enabled.direct)
-            ? api.getDirectModels().then(d => Array.isArray(d) ? d : (d.models || [])).catch(() => [])
+          loadSources.direct
+            ? api.getDirectModels()
+              .then(d => filterDirectModelsForAdvisor(Array.isArray(d) ? d : (d.models || []), settings))
+              .catch(() => [])
             : [],
-          enabled.custom
+          loadSources.custom
             ? api.getCustomEndpointModels().then(d => d.models || []).catch(() => [])
             : [],
         ]);
@@ -81,22 +199,55 @@ export default function AdvisorSetup({
 
         setModels(sorted);
 
-        // Pre-select advisor default model from settings
-        if (settings.advisor_default_model) {
-          setChosenModel(settings.advisor_default_model);
-        } else if (sorted.length > 0) {
-          setChosenModel(sorted[0].id);
-        }
-        if (settings.advisor_tiebreaker_model) {
-          setTiebreakerModel(settings.advisor_tiebreaker_model);
-        } else if (settings.advisor_default_model) {
-          setTiebreakerModel(settings.advisor_default_model);
-        } else if (sorted.length > 0) {
-          setTiebreakerModel(sorted[0].id);
-        }
+        const loadedPresets = Array.isArray(settings.advisor_presets) ? settings.advisor_presets : [];
+        setPresets(loadedPresets);
 
-        if (settings.advisor_default_rounds) {
-          setRounds(Math.min(10, Math.max(3, settings.advisor_default_rounds)));
+        let initialModel = settings.advisor_default_model || (sorted.length > 0 ? sorted[0].id : '');
+        let initialTiebreaker = settings.advisor_tiebreaker_model || initialModel;
+        let initialRounds = clampRounds(settings.advisor_default_rounds);
+
+        setChosenModel(initialModel);
+        setTiebreakerModel(initialTiebreaker);
+        setRounds(initialRounds);
+
+        const defaultPreset = loadedPresets.find((p) => p.is_default) || null;
+        if (defaultPreset) {
+          const personaIds = (defaultPreset.persona_ids || []).slice(0, 4);
+          const mode = normalizePresetMode(defaultPreset.mode);
+          if (defaultPreset.default_model) {
+            initialModel = defaultPreset.default_model;
+            setChosenModel(defaultPreset.default_model);
+          }
+          if (defaultPreset.tiebreaker_model) {
+            initialTiebreaker = defaultPreset.tiebreaker_model;
+            setTiebreakerModel(defaultPreset.tiebreaker_model);
+          } else if (defaultPreset.default_model) {
+            initialTiebreaker = defaultPreset.default_model;
+            setTiebreakerModel(defaultPreset.default_model);
+          }
+          const modelAssignmentsForPreset =
+            mode === 'advanced' && defaultPreset.model_assignments
+              ? { ...defaultPreset.model_assignments }
+              : {};
+          if (defaultPreset.max_rounds) {
+            initialRounds = clampRounds(defaultPreset.max_rounds);
+            setRounds(initialRounds);
+          }
+
+          setSelectedPersonaIds(personaIds);
+          setModelMode(mode);
+          setModelAssignments(modelAssignmentsForPreset);
+          setSearchProvider(defaultPreset.search_provider ?? null);
+          setActivePresetId(defaultPreset.id);
+          loadedSnapshotRef.current = buildPresetSnapshot({
+            selectedPersonaIds: personaIds,
+            modelMode: mode,
+            chosenModel: initialModel,
+            tiebreakerModel: initialTiebreaker,
+            modelAssignments: modelAssignmentsForPreset,
+            rounds: initialRounds,
+            searchProvider: defaultPreset.search_provider ?? null,
+          });
         }
       } catch (err) {
         console.error('Failed to load advisor models:', err);
@@ -128,39 +279,227 @@ export default function AdvisorSetup({
     }
   };
 
-  const handleSimpleModelChange = async (modelId) => {
-    setChosenModel(modelId);
+  const persistAdvisorSetting = async (field, value, setter) => {
+    setter(value);
     try {
       const currentSettings = await api.getSettings();
-      await api.updateSettings({
-        ...currentSettings,
-        advisor_default_model: modelId
-      });
+      await api.updateSettings({ ...currentSettings, [field]: value });
     } catch (err) {
-      console.error('Failed to auto-save advisor default model:', err);
+      console.error(`Failed to auto-save ${field}:`, err);
     }
+  };
+
+  const handleSimpleModelChange = (modelId) => {
+    persistAdvisorSetting('advisor_default_model', modelId, setChosenModel);
   };
 
   const handleModelAssignment = (personaId, modelId) => {
     setModelAssignments((prev) => ({ ...prev, [personaId]: modelId }));
   };
 
-  const handleTiebreakerModelChange = async (modelId) => {
-    setTiebreakerModel(modelId);
-    try {
-      const currentSettings = await api.getSettings();
-      await api.updateSettings({
-        ...currentSettings,
-        advisor_tiebreaker_model: modelId
-      });
-    } catch (err) {
-      console.error('Failed to auto-save advisor tiebreaker model:', err);
-    }
+  const handleTiebreakerModelChange = (modelId) => {
+    persistAdvisorSetting('advisor_tiebreaker_model', modelId, setTiebreakerModel);
   };
 
   const handleRoundsStep = (delta) => {
-    setRounds((prev) => Math.min(10, Math.max(3, prev + delta)));
+    setRounds((prev) => clampRounds(prev + delta));
   };
+
+  const currentSnapshot = useMemo(
+    () => buildPresetSnapshot({
+      selectedPersonaIds,
+      modelMode,
+      chosenModel,
+      tiebreakerModel,
+      modelAssignments,
+      rounds,
+      searchProvider,
+    }),
+    [selectedPersonaIds, modelMode, chosenModel, tiebreakerModel, modelAssignments, rounds, searchProvider]
+  );
+
+  const isPresetDirty = activePresetId != null && !snapshotsEqual(currentSnapshot, loadedSnapshotRef.current);
+
+  const activePreset = useMemo(
+    () => presets.find((p) => p.id === activePresetId) || null,
+    [presets, activePresetId]
+  );
+
+  const persistPresets = async (nextPresets) => {
+    await api.updateSettings({ advisor_presets: nextPresets });
+    setPresets(nextPresets);
+  };
+
+  const applyPresetToForm = useCallback((preset, { markClean = true, touchLastUsed = true } = {}) => {
+    const personaIds = (preset.persona_ids || []).slice(0, 4);
+    const mode = normalizePresetMode(preset.mode);
+    const nextModel = preset.default_model || chosenModel;
+    const nextTiebreaker = preset.tiebreaker_model || preset.default_model || tiebreakerModel;
+    const nextAssignments =
+      mode === 'advanced' && preset.model_assignments
+        ? { ...preset.model_assignments }
+        : {};
+    const nextRounds = preset.max_rounds ? clampRounds(preset.max_rounds) : rounds;
+    const nextSearchProvider = preset.search_provider ?? null;
+
+    setSelectedPersonaIds(personaIds);
+    setModelMode(mode);
+    if (preset.default_model) setChosenModel(nextModel);
+    if (preset.tiebreaker_model) setTiebreakerModel(nextTiebreaker);
+    else if (preset.default_model) setTiebreakerModel(nextTiebreaker);
+    setModelAssignments(nextAssignments);
+    if (preset.max_rounds) setRounds(nextRounds);
+    setSearchProvider(nextSearchProvider);
+    setActivePresetId(preset.id);
+    setPresetPopoverOpen(false);
+
+    if (markClean) {
+      loadedSnapshotRef.current = buildPresetSnapshot({
+        selectedPersonaIds: personaIds,
+        modelMode: mode,
+        chosenModel: nextModel,
+        tiebreakerModel: nextTiebreaker,
+        modelAssignments: nextAssignments,
+        rounds: nextRounds,
+        searchProvider: nextSearchProvider,
+      });
+    }
+
+    if (touchLastUsed) {
+      const now = new Date().toISOString();
+      const nextPresets = presets.map((p) => (
+        p.id === preset.id ? { ...p, last_used_at: now } : p
+      ));
+      persistPresets(nextPresets).catch((err) => {
+        console.error('Failed to update preset last used:', err);
+      });
+    }
+  }, [chosenModel, tiebreakerModel, rounds, presets]);
+
+  const handleSelectCustomSetup = () => {
+    setActivePresetId(null);
+    loadedSnapshotRef.current = null;
+    setPresetPopoverOpen(false);
+  };
+
+  const openSavePresetModal = () => {
+    setSaveForm({
+      name: activePreset?.name || '',
+      isDefault: activePreset?.is_default || presets.length === 0,
+      includeConfig: true,
+      updateExisting: Boolean(activePresetId),
+    });
+    setSaveModalOpen(true);
+    setPresetPopoverOpen(false);
+  };
+
+  const closeSavePresetModal = () => {
+    setSaveModalOpen(false);
+    setPresetSaving(false);
+  };
+
+  const buildPresetFromForm = (id, name, { isDefault, includeConfig }) => ({
+    id,
+    name: name.trim(),
+    persona_ids: selectedPersonaIds,
+    mode: modelMode,
+    default_model: chosenModel || '',
+    tiebreaker_model: tiebreakerModel || chosenModel || '',
+    model_assignments: modelMode === 'advanced' ? currentSnapshot.model_assignments : null,
+    max_rounds: includeConfig ? rounds : MIN_ROUNDS,
+    search_provider: includeConfig ? searchProvider : null,
+    is_default: isDefault,
+    last_used_at: new Date().toISOString(),
+  });
+
+  const handleSavePreset = async () => {
+    const name = saveForm.name.trim();
+    if (!name || presetSaving) return;
+
+    setPresetSaving(true);
+    try {
+      let nextPresets = [...presets];
+      const shouldUpdate = saveForm.updateExisting && activePresetId;
+
+      if (shouldUpdate) {
+        nextPresets = nextPresets.map((p) => {
+          if (p.id === activePresetId) {
+            return buildPresetFromForm(p.id, name, saveForm);
+          }
+          if (saveForm.isDefault) {
+            return { ...p, is_default: false };
+          }
+          return p;
+        });
+      } else {
+        const id = newPresetId();
+        const newPreset = buildPresetFromForm(id, name, saveForm);
+        nextPresets = [
+          newPreset,
+          ...(saveForm.isDefault ? presets.map((p) => ({ ...p, is_default: false })) : presets),
+        ].slice(0, MAX_PRESETS);
+        setActivePresetId(id);
+      }
+
+      await persistPresets(nextPresets);
+      loadedSnapshotRef.current = currentSnapshot;
+      closeSavePresetModal();
+    } catch (err) {
+      console.error('Failed to save advisor preset:', err);
+      setPresetSaving(false);
+    }
+  };
+
+  const handleDeletePreset = async (presetId) => {
+    try {
+      const nextPresets = presets.filter((p) => p.id !== presetId);
+      await persistPresets(nextPresets);
+      if (activePresetId === presetId) {
+        setActivePresetId(null);
+        loadedSnapshotRef.current = null;
+      }
+      setPresetPopoverOpen(false);
+    } catch (err) {
+      console.error('Failed to delete advisor preset:', err);
+    }
+  };
+
+  const handleSetDefaultPreset = async (presetId) => {
+    try {
+      const nextPresets = presets.map((p) => ({
+        ...p,
+        is_default: p.id === presetId,
+      }));
+      await persistPresets(nextPresets);
+    } catch (err) {
+      console.error('Failed to set default preset:', err);
+    }
+  };
+
+  const modelSummaryLine = useMemo(() => {
+    if (selectedPersonaIds.length === 0) return null;
+    const names = selectedPersonaIds
+      .map((id) => personas.find((p) => p.id === id)?.name)
+      .filter(Boolean);
+    if (names.length === 0) return null;
+
+    if (modelMode === 'simple' && chosenModel) {
+      return `${names.join(' · ')} → ${getShortModelName(chosenModel)}`;
+    }
+
+    if (modelMode === 'advanced') {
+      const parts = selectedPersonaIds.map((id) => {
+        const persona = personas.find((p) => p.id === id);
+        const model = modelAssignments[id];
+        if (!persona || !model) return null;
+        return `${persona.name} → ${getShortModelName(model)}`;
+      }).filter(Boolean);
+      if (parts.length === 0) return null;
+      return parts.join(' · ');
+    }
+
+    return null;
+  }, [selectedPersonaIds, personas, modelMode, chosenModel, modelAssignments]);
 
   const openEditModal = (e, persona) => {
     e.stopPropagation();
@@ -361,6 +700,104 @@ export default function AdvisorSetup({
           </div>
         </div>
 
+        <div className="advisor-setup__preset-row">
+          <div className="advisor-setup__preset-picker" ref={presetPopoverRef}>
+            <button
+              type="button"
+              className="advisor-setup__preset-btn"
+              onClick={() => setPresetPopoverOpen((v) => !v)}
+              aria-haspopup="listbox"
+              aria-expanded={presetPopoverOpen}
+            >
+              <span className="advisor-setup__preset-btn-icon" aria-hidden="true">📁</span>
+              <span className="advisor-setup__preset-btn-label">
+                {activePreset ? activePreset.name : 'Custom setup'}
+              </span>
+              <span className="advisor-setup__preset-chevron">›</span>
+            </button>
+            {presetPopoverOpen && (
+              <div className="advisor-setup__preset-popover" role="listbox">
+                <button
+                  type="button"
+                  className={`advisor-setup__preset-option ${!activePresetId ? 'advisor-setup__preset-option--selected' : ''}`}
+                  onClick={handleSelectCustomSetup}
+                >
+                  Custom setup
+                </button>
+                {presets.length === 0 ? (
+                  <div className="advisor-setup__preset-empty">No saved presets yet</div>
+                ) : (
+                  presets.map((preset) => (
+                    <div key={preset.id} className="advisor-setup__preset-option-row">
+                      <button
+                        type="button"
+                        className={`advisor-setup__preset-option ${activePresetId === preset.id ? 'advisor-setup__preset-option--selected' : ''}`}
+                        onClick={() => applyPresetToForm(preset)}
+                      >
+                        {preset.is_default && <span className="advisor-setup__preset-star" aria-hidden="true">⭐</span>}
+                        <span>{preset.name}</span>
+                      </button>
+                      <div className="advisor-setup__preset-option-actions">
+                        {!preset.is_default && (
+                          <button
+                            type="button"
+                            className="advisor-setup__preset-action-btn"
+                            title="Set as default"
+                            aria-label={`Set ${preset.name} as default`}
+                            onClick={() => handleSetDefaultPreset(preset.id)}
+                          >
+                            ☆
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="advisor-setup__preset-action-btn advisor-setup__preset-action-btn--delete"
+                          title="Delete preset"
+                          aria-label={`Delete ${preset.name}`}
+                          onClick={() => handleDeletePreset(preset.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div className="advisor-setup__preset-popover-footer">
+                  <button
+                    type="button"
+                    className="advisor-setup__preset-footer-btn"
+                    onClick={openSavePresetModal}
+                  >
+                    Save current as…
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {(isPresetDirty || !activePresetId) && (
+            <button
+              type="button"
+              className="advisor-setup__preset-save-link"
+              onClick={openSavePresetModal}
+            >
+              Save preset…
+            </button>
+          )}
+        </div>
+
+        {!modelsLoading && models.length === 0 && (
+          <p className="advisor-setup__model-empty">
+            No models available. Add and test API keys in Settings → LLM API Keys (Ollama URL, NVIDIA, OpenRouter, etc.).
+          </p>
+        )}
+
+        {modelSummaryLine && (
+          <p className="advisor-setup__model-summary">{modelSummaryLine}</p>
+        )}
+        {isPresetDirty && (
+          <p className="advisor-setup__preset-dirty">Unsaved changes from preset</p>
+        )}
+
         {modelMode === 'simple' ? (
           <div className="advisor-setup__model-simple">
             <label className="advisor-setup__model-label">
@@ -502,6 +939,84 @@ export default function AdvisorSetup({
           </div>
         </div>
       </div>
+
+      {/* Save Preset Modal */}
+      {saveModalOpen && (
+        <div className="advisor-setup__edit-overlay" onClick={closeSavePresetModal}>
+          <div className="advisor-setup__edit-modal advisor-setup__edit-modal--compact" onClick={(e) => e.stopPropagation()}>
+            <div className="advisor-setup__edit-header">
+              <span className="advisor-setup__edit-emoji">📁</span>
+              <span className="advisor-setup__edit-title">Save Preset</span>
+              <button type="button" className="advisor-setup__edit-close" onClick={closeSavePresetModal} aria-label="Close">✕</button>
+            </div>
+
+            <div className="advisor-setup__edit-body">
+              <label className="advisor-setup__edit-field">
+                <span className="advisor-setup__edit-label">Preset Name</span>
+                <input
+                  type="text"
+                  className="advisor-setup__edit-input"
+                  value={saveForm.name}
+                  onChange={(e) => setSaveForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Startup GTM Debate"
+                  maxLength={80}
+                  autoFocus
+                />
+              </label>
+
+              {activePresetId && (
+                <label className="advisor-setup__preset-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={saveForm.updateExisting}
+                    onChange={(e) => setSaveForm((f) => ({ ...f, updateExisting: e.target.checked }))}
+                  />
+                  <span>Update existing preset</span>
+                </label>
+              )}
+
+              <label className="advisor-setup__preset-checkbox">
+                <input
+                  type="checkbox"
+                  checked={saveForm.isDefault}
+                  onChange={(e) => setSaveForm((f) => ({ ...f, isDefault: e.target.checked }))}
+                />
+                <span>Set as default preset</span>
+              </label>
+
+              <label className="advisor-setup__preset-checkbox">
+                <input
+                  type="checkbox"
+                  checked={saveForm.includeConfig}
+                  onChange={(e) => setSaveForm((f) => ({ ...f, includeConfig: e.target.checked }))}
+                />
+                <span>Include rounds + web search settings</span>
+              </label>
+            </div>
+
+            <div className="advisor-setup__edit-footer">
+              <div className="advisor-setup__edit-footer-right">
+                <button
+                  type="button"
+                  className="advisor-setup__edit-btn advisor-setup__edit-btn--cancel"
+                  onClick={closeSavePresetModal}
+                  disabled={presetSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="advisor-setup__edit-btn advisor-setup__edit-btn--save"
+                  onClick={handleSavePreset}
+                  disabled={presetSaving || !saveForm.name.trim()}
+                >
+                  {presetSaving ? 'Saving…' : 'Save Preset'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Persona Modal */}
       {editingPersona && (

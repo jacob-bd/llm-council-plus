@@ -128,7 +128,7 @@ async def test_run_stage1_creates_conversation_and_returns_results(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {"query": "What is 2+2?"})
+        result = await server.call_tool("council_deliberate", {"action": "stage1", "query": "What is 2+2?"})
         data = get_json(result)
 
     assert data["conversation_id"] == "conv-s1-1"
@@ -158,7 +158,7 @@ async def test_run_stage1_uses_provided_conversation_id(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {
+        result = await server.call_tool("council_deliberate", {"action": "stage1", 
             "query": "hello",
             "conversation_id": "existing-conv",
         })
@@ -188,7 +188,7 @@ async def test_run_stage1_model_error(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {"query": "test"})
+        result = await server.call_tool("council_deliberate", {"action": "stage1", "query": "test"})
         data = get_json(result)
 
     assert data["summary"]["succeeded"] == 1
@@ -221,7 +221,7 @@ async def test_run_stage1_web_search_flag(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {
+        result = await server.call_tool("council_deliberate", {"action": "stage1", 
             "query": "What is 2+2?",
             "web_search": True,
         })
@@ -249,7 +249,7 @@ async def test_run_stage2_returns_rankings(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage2", {"query": "Explain quantum computing"})
+        result = await server.call_tool("council_deliberate", {"action": "stage2", "query": "Explain quantum computing"})
         data = get_json(result)
 
     assert data["conversation_id"] == "conv-s2"
@@ -274,7 +274,7 @@ async def test_run_stage2_uses_provided_conversation_id(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage2", {
+        result = await server.call_tool("council_deliberate", {"action": "stage2", 
             "query": "test query",
             "conversation_id": "existing-s2",
         })
@@ -301,7 +301,7 @@ async def test_run_stage3_returns_synthesis(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage3", {"query": "What is consciousness?"})
+        result = await server.call_tool("council_deliberate", {"action": "stage3", "query": "What is consciousness?"})
         data = get_json(result)
 
     assert data["conversation_id"] == "conv-s3"
@@ -323,7 +323,7 @@ async def test_run_stage3_uses_provided_conversation_id(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage3", {
+        result = await server.call_tool("council_deliberate", {"action": "stage3", 
             "query": "test",
             "conversation_id": "existing-s3",
         })
@@ -350,7 +350,7 @@ async def test_run_deliberation_returns_all_stages(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_deliberation", {
+        result = await server.call_tool("council_deliberate", {"action": "full", 
             "query": "What is the best programming language?"
         })
         data = get_json(result)
@@ -396,7 +396,7 @@ async def test_run_deliberation_model_override_passed_in_stream(server):
         ).mock(side_effect=capture_stream)
 
         override_models = ["groq:llama3-70b-8192", "ollama:llama3"]
-        result = await server.call_tool("run_deliberation", {
+        result = await server.call_tool("council_deliberate", {"action": "full", 
             "query": "test",
             "models": override_models,
         })
@@ -421,11 +421,12 @@ async def test_run_deliberation_no_settings_mutation_on_exception(server):
             side_effect=httpx.ConnectError("connection refused")
         )
 
-        with pytest.raises(Exception):
-            await server.call_tool("run_deliberation", {
-                "query": "test",
-                "models": ["groq:llama3-70b-8192", "ollama:llama3"],
-            })
+        result = await server.call_tool("council_deliberate", {"action": "full", 
+            "query": "test",
+            "models": ["groq:llama3-70b-8192", "ollama:llama3"],
+        })
+        data = get_json(result)
+        assert data["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -445,7 +446,7 @@ async def test_run_deliberation_no_model_override_skips_settings(server):
             )
         )
         # No GET or PUT settings mock — should not be called
-        result = await server.call_tool("run_deliberation", {"query": "test"})
+        result = await server.call_tool("council_deliberate", {"action": "full", "query": "test"})
         data = get_json(result)
 
     assert data["chairman_answer"] is not None
@@ -470,7 +471,7 @@ async def test_quick_chat_returns_single_model_response(server):
     with respx.mock:
         respx.post("http://test:8001/api/ask").mock(side_effect=capture_ask)
 
-        result = await server.call_tool("quick_chat", {
+        result = await server.call_tool("model_chat", {"action": "quick", 
             "query": "What time is it?",
             "model": "openai:gpt-4.1",
         })
@@ -500,7 +501,7 @@ async def test_quick_chat_with_web_search(server):
             })
         )
 
-        result = await server.call_tool("quick_chat", {
+        result = await server.call_tool("model_chat", {"action": "quick", 
             "query": "latest news",
             "model": "openai:gpt-4.1",
             "web_search": True,
@@ -519,8 +520,9 @@ async def test_quick_chat_propagates_api_errors(server):
             side_effect=httpx.ConnectError("connection refused")
         )
 
-        with pytest.raises(Exception):
-            await server.call_tool("quick_chat", {
-                "query": "test",
-                "model": "openai:gpt-4.1",
-            })
+        result = await server.call_tool("model_chat", {"action": "quick", 
+            "query": "test",
+            "model": "openai:gpt-4.1",
+        })
+        data = get_json(result)
+        assert data["status"] == "error"

@@ -1,15 +1,68 @@
 import StageTimer from './StageTimer';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import SearchContext from './SearchContext';
 import Stage1, { Stage1Skeleton } from './Stage1';
 import Stage2, { Stage2Skeleton } from './Stage2';
 import Stage3, { Stage3Skeleton } from './Stage3';
 import CouncilGrid from './CouncilGrid';
+import CouncilSetup from './CouncilSetup';
 import ExecutionModeToggle from './ExecutionModeToggle';
 import DebateView from './DebateView';
 import AdvisorSetup from './AdvisorSetup';
 import MarkdownContent from './MarkdownContent';
 import './ChatInterface.css';
+
+function hasStage1Results(msg) {
+    return Array.isArray(msg.stage1) && msg.stage1.length > 0;
+}
+
+function hasStage2Results(msg) {
+    return Array.isArray(msg.stage2) && msg.stage2.length > 0;
+}
+
+function hasStage2Started(msg) {
+    return Boolean(msg.loading?.stage2 || hasStage2Results(msg));
+}
+
+function shouldShowStage1CouncilGrid(msg) {
+    return msg.loading?.stage1 || (hasStage1Results(msg) && !hasStage2Started(msg));
+}
+
+function shouldShowStage1Results(msg) {
+    return msg.loading?.stage1 || hasStage1Results(msg);
+}
+
+function getDeliberationScrollPhase(msg) {
+    if (!msg || msg.role !== 'assistant') return 'idle';
+    if (msg.loading?.stage3 || msg.stage3) return 'stage3';
+    if (hasStage2Started(msg)) return 'stage2';
+    if (msg.loading?.stage1 || hasStage1Results(msg)) return 'stage1';
+    if (msg.loading?.search) return 'search';
+    return 'idle';
+}
+
+function renderStage1Content(msg) {
+    if (!shouldShowStage1Results(msg)) return null;
+    if (msg.loading?.stage1 && !hasStage1Results(msg)) return <Stage1Skeleton />;
+    if (!hasStage1Results(msg)) return null;
+    return (
+        <Stage1
+            responses={msg.stage1}
+            startTime={msg.timers?.stage1Start}
+            endTime={msg.timers?.stage1End}
+        />
+    );
+}
+
+function isCouncilTurnPending(msg, isActiveTurn, isLoading) {
+    if (!isActiveTurn || !isLoading || msg.error || msg.aborted) return false;
+    if (msg.loading?.search || msg.loading?.stage1 || msg.loading?.stage2 || msg.loading?.stage3) {
+        return false;
+    }
+    if (hasStage1Results(msg) || hasStage2Results(msg) || msg.stage3) return false;
+    if (msg.metadata?.search_context) return false;
+    return true;
+}
 
 export default function ChatInterface({
     conversation,
@@ -27,6 +80,7 @@ export default function ChatInterface({
     mode = 'council',
     onStartDebate,
     onNewConversation,
+    onCouncilChange,
 }) {
     const [input, setInput] = useState('');
     const [activeSearchProvider, setActiveSearchProvider] = useState(null);
@@ -34,23 +88,36 @@ export default function ChatInterface({
     const searchPopoverRef = useRef(null);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+    const stage2AnchorRef = useRef(null);
+    const stage3AnchorRef = useRef(null);
+    const prevScrollPhaseRef = useRef(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    // Only auto-scroll if user is already near the bottom
-    // This prevents interrupting reading when new content arrives
-    useEffect(() => {
-        if (!messagesContainerRef.current) return;
+    useLayoutEffect(() => {
+        if (!messagesContainerRef.current || !conversation?.messages?.length) return;
 
         const container = messagesContainerRef.current;
+        const lastMsg = conversation.messages[conversation.messages.length - 1];
+        const phase = getDeliberationScrollPhase(lastMsg);
+        const prevPhase = prevScrollPhaseRef.current;
+        prevScrollPhaseRef.current = phase;
+
+        const scrollAnchors = {
+            'stage1->stage2': stage2AnchorRef,
+            'stage2->stage3': stage3AnchorRef,
+        };
+        const anchorRef = scrollAnchors[`${prevPhase}->${phase}`];
+        if (anchorRef) {
+            requestAnimationFrame(() => {
+                anchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+            return;
+        }
+
         const isNearBottom =
             container.scrollHeight - container.scrollTop - container.clientHeight < 150;
 
-        // Auto-scroll only if user is already at/near bottom
         if (isNearBottom) {
-            scrollToBottom();
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
     }, [conversation]);
 
@@ -98,13 +165,19 @@ export default function ChatInterface({
                 <div className="empty-state">
                     <h1>Welcome to LLM Council <span className="plus-text">Plus</span></h1>
                     <p className="hero-message">
-                        The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
+                        Configure your council below, then start a session or ask your question.
                     </p>
                     <div className="welcome-grid-container">
-                        <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" chairmanDisabled={executionMode !== 'full'} />
+                        <CouncilSetup
+                            councilModels={councilModels}
+                            chairmanModel={chairmanModel}
+                            executionMode={executionMode}
+                            editable
+                            onCouncilChange={onCouncilChange}
+                            onOpenSettings={onOpenSettings}
+                        />
                     </div>
-                    <button className="start-session-btn" onClick={onNewConversation}>
-                        <span className="btn-glow" />
+                    <button className="start-session-btn start-session-btn--secondary" onClick={onNewConversation}>
                         <span className="btn-content">
                             <span className="btn-icon">✨</span>
                             Start a New Council Session
@@ -131,15 +204,27 @@ export default function ChatInterface({
                         <div className="hero-content">
                             <h1>Welcome to LLM Council <span className="text-gradient">Plus</span></h1>
                             <p className="hero-subtitle">
-                                The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
+                                Configure your council below, then ask your question.
                             </p>
                             <div className="welcome-grid-container">
-                                <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" chairmanDisabled={executionMode !== 'full'} />
+                                <CouncilSetup
+                                    councilModels={councilModels}
+                                    chairmanModel={chairmanModel}
+                                    executionMode={executionMode}
+                                    editable
+                                    onCouncilChange={onCouncilChange}
+                                    onOpenSettings={onOpenSettings}
+                                />
                             </div>
                         </div>
                     </div>
                 ) : (
-                    conversation.messages.map((msg, index) => (
+                    conversation.messages.map((msg, index) => {
+                        const isActiveCouncilTurn = msg.role === 'assistant'
+                            && index === conversation.messages.length - 1
+                            && isLoading;
+
+                        return (
                         <div key={`${conversation.id}-msg-${index}`} className={`message ${msg.role}`}>
                             <div className="message-role">
                                 {msg.role === 'user'
@@ -165,6 +250,20 @@ export default function ChatInterface({
                                     />
                                 ) : (
                                     <>
+                                        {msg.error && (
+                                            <div className="council-error">
+                                                <span className="council-error-icon">⚠️</span>
+                                                <span className="council-error-text">{msg.error}</span>
+                                            </div>
+                                        )}
+
+                                        {isCouncilTurnPending(msg, isActiveCouncilTurn, isLoading) && (
+                                            <div className="stage-loading">
+                                                <div className="spinner"></div>
+                                                <span>Consulting the council…</span>
+                                            </div>
+                                        )}
+
                                         {/* Search Loading */}
                                         {msg.loading?.search && (
                                             <div className="stage-loading">
@@ -184,8 +283,8 @@ export default function ChatInterface({
                                             />
                                         )}
 
-                                        {/* Stage 1: Council Grid Visualization */}
-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) && (
+                                        {/* Stage 1: Council Grid Visualization (during deliberation only) */}
+                                        {shouldShowStage1CouncilGrid(msg) && (
                                             <div className="stage-container">
                                                 <div className="stage-header">
                                                     <h3>Stage 1: Council Deliberation</h3>
@@ -209,44 +308,39 @@ export default function ChatInterface({
                                             </div>
                                         )}
 
-                                        {/* Stage 1 Results (Accordion/List - kept for detail view) */}
-                                        {(msg.loading?.stage1 || (msg.stage1 && !msg.stage2)) ? (
-                                            msg.loading?.stage1 && !msg.stage1 ? (
-                                                <Stage1Skeleton />
-                                            ) : msg.stage1 && (
-                                                <Stage1
-                                                    responses={msg.stage1}
-                                                    startTime={msg.timers?.stage1Start}
-                                                    endTime={msg.timers?.stage1End}
-                                                />
-                                            )
-                                        ) : null}
+                                        {renderStage1Content(msg)}
 
                                         {/* Stage 2 */}
-                                        {msg.loading?.stage2 && (
-                                            <Stage2Skeleton />
-                                        )}
-                                        {msg.stage2 && (
-                                            <Stage2
-                                                rankings={msg.stage2}
-                                                labelToModel={msg.metadata?.label_to_model}
-                                                aggregateRankings={msg.metadata?.aggregate_rankings}
-                                                startTime={msg.timers?.stage2Start}
-                                                endTime={msg.timers?.stage2End}
-                                            />
-                                        )}
+                                        <div
+                                            ref={isActiveCouncilTurn ? stage2AnchorRef : null}
+                                            className="stage-scroll-anchor"
+                                        >
+                                            {msg.loading?.stage2 && <Stage2Skeleton />}
+                                            {hasStage2Results(msg) && (
+                                                <Stage2
+                                                    rankings={msg.stage2}
+                                                    labelToModel={msg.metadata?.label_to_model}
+                                                    aggregateRankings={msg.metadata?.aggregate_rankings}
+                                                    startTime={msg.timers?.stage2Start}
+                                                    endTime={msg.timers?.stage2End}
+                                                />
+                                            )}
+                                        </div>
 
                                         {/* Stage 3 */}
-                                        {msg.loading?.stage3 && (
-                                            <Stage3Skeleton />
-                                        )}
-                                        {msg.stage3 && (
-                                            <Stage3
-                                                finalResponse={msg.stage3}
-                                                startTime={msg.timers?.stage3Start}
-                                                endTime={msg.timers?.stage3End}
-                                            />
-                                        )}
+                                        <div
+                                            ref={isActiveCouncilTurn ? stage3AnchorRef : null}
+                                            className="stage-scroll-anchor"
+                                        >
+                                            {msg.loading?.stage3 && <Stage3Skeleton />}
+                                            {msg.stage3 && (
+                                                <Stage3
+                                                    finalResponse={msg.stage3}
+                                                    startTime={msg.timers?.stage3Start}
+                                                    endTime={msg.timers?.stage3End}
+                                                />
+                                            )}
+                                        </div>
 
                                         {/* Aborted Indicator */}
                                         {msg.aborted && (
@@ -254,7 +348,7 @@ export default function ChatInterface({
                                                 <span className="aborted-icon">⏹</span>
                                                 <span className="aborted-text">
                                                     Generation stopped by user.
-                                                    {msg.stage1 && !msg.stage3 && ' Partial results shown above.'}
+                                                    {hasStage1Results(msg) && !msg.stage3 && ' Partial results shown above.'}
                                                 </span>
                                             </div>
                                         )}
@@ -262,7 +356,8 @@ export default function ChatInterface({
                                 )}
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 )}
 
                 {/* Bottom Spacer for floating input */}
@@ -274,10 +369,9 @@ export default function ChatInterface({
                 {!councilConfigured ? (
                     <div className="input-container config-required">
                         <span className="config-message">
-                            ⚠️ Council not ready.
+                            ⚠️ Council not ready — add at least one member
+                            {executionMode === 'full' ? ' and a chairman' : ''}.
                             <button className="config-link" onClick={() => onOpenSettings('llm_keys')}>Configure API Keys</button>
-                            <span className="config-separator">or</span>
-                            <button className="config-link" onClick={() => onOpenSettings('council')}>Configure Council</button>
                         </span>
                     </div>
                 ) : (

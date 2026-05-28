@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- _(none)_
+
+## [0.5.2] - 2026-05-27
+
+### Added
+- **Inline council setup**: Edit council members and chairman on the welcome screen (landing + empty conversation) with auto-save, compact member list (+ Add up to 8), live grid preview, and **council presets** (members + chairman only; default auto-loads).
+- **Advisor model presets**: Save and load named advisor setups (selected personas, Simple/Advanced model assignment, optional rounds and web search) from the Model Assignment section in Advisor Setup. Presets persist in `settings.json` via `advisor_presets`.
+- **Documentation sync checklist**: [`docs/DOC-SYNC.md`](docs/DOC-SYNC.md) — required file matrix for keeping REST API, MCP tools, skill, and user docs aligned on every change.
+- **MCP preset CRUD**: `council_settings` and `advisor_settings` now support `list_presets`, `save_preset`, `delete_preset`, and `set_default_preset` actions.
+
+### Changed
+- **MCP tool consolidation (breaking)**: Replaced 25 single-purpose MCP tools with **9 action-based tools** — `council_deliberate`, `model_chat`, `advisor_debate`, `council_settings`, `advisor_settings`, `personas`, `conversations`, `providers`, `config_backup`. Legacy names (`run_deliberation`, `get_council_config`, `check_health`, etc.) removed.
+- **MCP-first agent routing**: Skill and MCP server instructions tell agents to prefer MCP tools over curl when both are available; REST documented as fallback (`skills/llm-council-api/SKILL.md`, `llm_council_mcp/server.py`, `docs/mcp/INSTRUCTIONS.md`, `docs/mcp/TOOLS.md`).
+- **Advisor model sources decoupled from Council toggles**: Advisor Setup model pickers list all **configured** providers (API keys, Ollama URL, custom endpoint). Settings → Council Config `enabled_providers` toggles apply to **LLM Council only**.
+- **Council Config copy**: Clarifies provider toggles are council-only; advisors always use configured providers from LLM API Keys.
+- **New Council navigation**: Sidebar **+ New Council** from advisors mode now switches to council mode (previously stayed on advisor UI).
+- **Chairman validation**: Chairman required only for **Full Deliberation**; Chat Only and Chat + Ranking no longer block send without a chairman.
+- **Stream API**: Frontend sends `council_models` / `chairman_model` on message stream so the run matches the on-screen lineup.
+- **MCP docs sync**: All docs and `skills/llm-council-api/SKILL.md` updated for **9-tool** MCP catalog; `/api/health` reports `tools: 9`.
+
+### Removed
+- **25 legacy MCP tools** — see migration table in `docs/mcp/INSTRUCTIONS.md`.
+
 ## [0.5.1] - 2026-05-24
 
 ### Added

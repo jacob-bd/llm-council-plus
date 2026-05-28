@@ -36,7 +36,7 @@ async def test_check_health_backend_reachable(server):
         respx.get("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json=settings)
         )
-        result = await server.call_tool("check_health", {})
+        result = await server.call_tool("providers", {"action": "health"})
         data = get_json(result)
 
     assert data["backend"] == "reachable"
@@ -56,7 +56,7 @@ async def test_check_health_backend_unreachable(server):
         respx.get("http://test:8001/api/health").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
-        result = await server.call_tool("check_health", {})
+        result = await server.call_tool("providers", {"action": "health"})
         data = get_json(result)
 
     assert data["backend"] == "unreachable"
@@ -80,7 +80,7 @@ async def test_check_health_no_configured_providers(server):
         respx.get("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json=settings)
         )
-        result = await server.call_tool("check_health", {})
+        result = await server.call_tool("providers", {"action": "health"})
         data = get_json(result)
 
     assert data["backend"] == "reachable"
@@ -97,7 +97,7 @@ async def test_check_health_settings_error(server):
         respx.get("http://test:8001/api/settings").mock(
             return_value=httpx.Response(500, json={"detail": "Internal Server Error"})
         )
-        result = await server.call_tool("check_health", {})
+        result = await server.call_tool("providers", {"action": "health"})
         data = get_json(result)
 
     assert data["backend"] == "reachable"
@@ -116,7 +116,7 @@ async def test_test_provider_success(server):
                 "message": "OpenAI connection successful. Model: gpt-4.1",
             })
         )
-        result = await server.call_tool("test_provider", {"provider": "openai"})
+        result = await server.call_tool("providers", {"action": "test", "provider": "openai"})
         data = get_json(result)
 
     assert data["success"] is True
@@ -136,7 +136,7 @@ async def test_test_provider_with_api_key(server):
         respx.post("http://test:8001/api/settings/test-provider").mock(
             side_effect=capture_request
         )
-        result = await server.call_tool("test_provider", {
+        result = await server.call_tool("providers", {"action": "test", 
             "provider": "anthropic",
             "api_key": "sk-ant-test-key",
         })
@@ -157,7 +157,7 @@ async def test_test_provider_failure(server):
                 "message": "Invalid API key",
             })
         )
-        result = await server.call_tool("test_provider", {"provider": "groq"})
+        result = await server.call_tool("providers", {"action": "test", "provider": "groq"})
         data = get_json(result)
 
     assert data["success"] is False
@@ -171,7 +171,7 @@ async def test_test_provider_connection_error(server):
         respx.post("http://test:8001/api/settings/test-provider").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
-        result = await server.call_tool("test_provider", {"provider": "openai"})
+        result = await server.call_tool("providers", {"action": "test", "provider": "openai"})
         data = get_json(result)
 
     assert data["success"] is False
@@ -187,7 +187,7 @@ async def test_list_conversations_empty(server):
         respx.get("http://test:8001/api/conversations").mock(
             return_value=httpx.Response(200, json=[])
         )
-        result = await server.call_tool("list_conversations", {})
+        result = await server.call_tool("conversations", {"action": "list"})
         text = get_text(result)
 
     assert "No conversations found" in text
@@ -214,7 +214,7 @@ async def test_list_conversations(server):
         respx.get("http://test:8001/api/conversations").mock(
             return_value=httpx.Response(200, json=conversations)
         )
-        result = await server.call_tool("list_conversations", {})
+        result = await server.call_tool("conversations", {"action": "list"})
         text = get_text(result)
 
     assert "Found 2 conversation(s)" in text
@@ -240,7 +240,7 @@ async def test_list_conversations_untitled(server):
         respx.get("http://test:8001/api/conversations").mock(
             return_value=httpx.Response(200, json=conversations)
         )
-        result = await server.call_tool("list_conversations", {})
+        result = await server.call_tool("conversations", {"action": "list"})
         text = get_text(result)
 
     assert "(untitled)" in text
@@ -279,7 +279,7 @@ async def test_get_conversation(server):
         respx.get("http://test:8001/api/conversations/conv-abc123").mock(
             return_value=httpx.Response(200, json=conv)
         )
-        result = await server.call_tool("get_conversation", {"conversation_id": "conv-abc123"})
+        result = await server.call_tool("conversations", {"action": "get", "conversation_id": "conv-abc123"})
         data = get_json(result)
 
     assert data["id"] == "conv-abc123"
@@ -305,11 +305,11 @@ async def test_get_conversation_not_found(server):
         respx.get("http://test:8001/api/conversations/bad-id").mock(
             return_value=httpx.Response(404, json={"detail": "Conversation not found"})
         )
-        result = await server.call_tool("get_conversation", {"conversation_id": "bad-id"})
+        result = await server.call_tool("conversations", {"action": "get", "conversation_id": "bad-id"})
         data = get_json(result)
 
-    assert "error" in data
-    assert "not found" in data["error"].lower()
+    assert data["status"] == "error"
+    assert "not found" in data["message"].lower()
 
 
 @pytest.mark.asyncio
@@ -328,7 +328,7 @@ async def test_get_conversation_truncates_long_user_content(server):
         respx.get("http://test:8001/api/conversations/conv-long").mock(
             return_value=httpx.Response(200, json=conv)
         )
-        result = await server.call_tool("get_conversation", {"conversation_id": "conv-long"})
+        result = await server.call_tool("conversations", {"action": "get", "conversation_id": "conv-long"})
         data = get_json(result)
 
     user_msg = data["messages"][0]
@@ -356,7 +356,7 @@ async def test_get_conversation_no_stage3(server):
         respx.get("http://test:8001/api/conversations/conv-chat-only").mock(
             return_value=httpx.Response(200, json=conv)
         )
-        result = await server.call_tool("get_conversation", {"conversation_id": "conv-chat-only"})
+        result = await server.call_tool("conversations", {"action": "get", "conversation_id": "conv-chat-only"})
         data = get_json(result)
 
     assistant_msg = data["messages"][1]

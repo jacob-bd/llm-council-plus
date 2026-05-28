@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useRef, Component } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef, useCallback, Component } from 'react';
 import Sidebar from './components/Sidebar';
 import { api, DEFAULT_EXECUTION_MODE, buildAvailableSearchProviders } from './api';
 import './App.css';
@@ -66,6 +66,35 @@ function App() {
   const conversationVersionRef = useRef(0);
   const skipLoadForIdRef = useRef(null);
 
+  const computeCouncilConfigured = useCallback((models, chairman, mode) => {
+    const members = (models || []).filter((m) => m && m.trim());
+    if (members.length < 1) return false;
+    if (mode === 'full') {
+      return !!(chairman && chairman.trim());
+    }
+    return true;
+  }, []);
+
+  const handleCouncilChange = useCallback(async ({ councilModels: nextModels, chairmanModel: nextChairman }) => {
+    const filtered = (nextModels || []).filter((m) => m && m.trim());
+    const chairman = nextChairman || '';
+    setCouncilModels(filtered);
+    setChairmanModel(chairman);
+    setCouncilConfigured(computeCouncilConfigured(filtered, chairman, executionMode));
+    try {
+      await api.updateSettings({
+        council_models: filtered,
+        chairman_model: chairman,
+      });
+    } catch (err) {
+      console.error('Failed to save council lineup:', err);
+    }
+  }, [computeCouncilConfigured, executionMode]);
+
+  useEffect(() => {
+    setCouncilConfigured(computeCouncilConfigured(councilModels, chairmanModel, executionMode));
+  }, [councilModels, chairmanModel, executionMode, computeCouncilConfigured]);
+
   // Check initial configuration on mount
   useEffect(() => {
     checkInitialSetup();
@@ -115,15 +144,13 @@ function App() {
       }
 
       // 3. Check if council is configured (has models selected)
-      const models = settings.council_models || [];
+      const models = (settings.council_models || []).filter((m) => m && m.trim());
       const chairman = settings.chairman_model || '';
 
       setCouncilModels(models);
       setChairmanModel(chairman);
 
-      const hasCouncilMembers = models.some(m => m && m.trim() !== '');
-      const hasChairman = chairman && chairman.trim() !== '';
-      setCouncilConfigured(hasCouncilMembers && hasChairman);
+      setCouncilConfigured(computeCouncilConfigured(models, chairman, settings.execution_mode || DEFAULT_EXECUTION_MODE));
 
       // 4. If no providers are configured, open settings
       if (!hasApiKey && !isOllamaConnected) {
@@ -140,17 +167,20 @@ function App() {
     setShowSettings(false);
     try {
       const settings = await api.getSettings();
-      const models = settings.council_models || [];
+      const models = (settings.council_models || []).filter((m) => m && m.trim());
       const chairman = settings.chairman_model || '';
 
       setCouncilModels(models);
       setChairmanModel(chairman);
       setSearchProvider(settings.search_provider || 'duckduckgo');
       setAvailableSearchProviders(buildAvailableSearchProviders(settings));
+      setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
 
-      const hasCouncilMembers = models.some(m => m && m.trim() !== '');
-      const hasChairman = chairman && chairman.trim() !== '';
-      setCouncilConfigured(hasCouncilMembers && hasChairman);
+      setCouncilConfigured(computeCouncilConfigured(
+        models,
+        chairman,
+        settings.execution_mode || DEFAULT_EXECUTION_MODE
+      ));
     } catch (error) {
       console.error('Error after closing settings:', error);
     }
@@ -259,22 +289,43 @@ function App() {
     }
   };
 
+  const abortAllStreams = () => {
+    if (advisorAbortControllerRef.current) {
+      advisorAbortControllerRef.current.abort();
+      advisorAbortControllerRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   const handleNewConversation = async () => {
-    // Check if there's already an empty/unused conversation
-    const existingEmpty = conversations.find(conv => !conv.title && conv.message_count === 0);
+    abortAllStreams();
+    setIsLoading(false);
+    setAppMode('council');
+
+    // Reuse an empty council conversation only (not advisor drafts)
+    const existingEmpty = conversations.find(
+      (conv) =>
+        conv.mode !== 'advisors'
+        && (!conv.title || conv.title === 'New Conversation')
+        && conv.message_count === 0
+    );
 
     if (existingEmpty) {
-      // Reuse the existing empty conversation instead of creating a new one
+      setCurrentConversation(null);
       setCurrentConversationId(existingEmpty.id);
       return;
     }
 
     try {
-      const newConv = await api.createConversation();
+      const newConv = await api.createConversation({ mode: 'council' });
       setConversations([
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+        { id: newConv.id, created_at: newConv.created_at, message_count: 0, mode: 'council' },
         ...conversations,
       ]);
+      setCurrentConversation(null);
       setCurrentConversationId(newConv.id);
     } catch (error) {
       console.error('Failed to create conversation:', error);
@@ -584,7 +635,13 @@ function App() {
       // Send message with streaming
       await api.sendMessageStream(
         currentConversationId,
-        { content, searchProvider, executionMode },
+        {
+          content,
+          searchProvider,
+          executionMode,
+          councilModels,
+          chairmanModel: executionMode === 'full' ? chairmanModel : undefined,
+        },
         (eventType, event) => {
           switch (eventType) {
             case 'search_start':
@@ -883,6 +940,24 @@ function App() {
 
             case 'error':
               console.error('Stream error:', event.message);
+              setCurrentConversation((prev) => {
+                if (!prev || prev.messages.length === 0) return prev;
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg.role === 'assistant') {
+                  messages[messages.length - 1] = {
+                    ...lastMsg,
+                    error: event.message || 'The council request failed.',
+                    loading: {
+                      search: false,
+                      stage1: false,
+                      stage2: false,
+                      stage3: false,
+                    },
+                  };
+                }
+                return { ...prev, messages };
+              });
               setIsLoading(false);
               break;
 
@@ -954,14 +1029,7 @@ function App() {
   };
 
   const resetAppState = (mode) => {
-    if (advisorAbortControllerRef.current) {
-      advisorAbortControllerRef.current.abort();
-      advisorAbortControllerRef.current = null;
-    }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
+    abortAllStreams();
     setIsLoading(false);
     setCurrentConversationId(null);
     setCurrentConversation(null);
@@ -1024,6 +1092,7 @@ function App() {
                 mode={appMode}
                 onStartDebate={handleStartDebate}
                 onNewConversation={handleNewConversation}
+                onCouncilChange={handleCouncilChange}
               />
             )}
           </Suspense>

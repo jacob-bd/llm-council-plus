@@ -65,13 +65,16 @@ Ask your AI:
 
 > "Check the council health"
 
-A successful response confirms the MCP server reached the backend:
+A successful response confirms the MCP server reached the backend (via `providers` → `health`):
 
+```json
+{
+  "backend": "reachable",
+  "configured_providers": ["openrouter", "anthropic"]
+}
 ```
-Backend is reachable at http://localhost:8001
-Providers configured: openrouter, anthropic
-Council members: 3 models selected
-```
+
+Confirm `"mcp": {"tools": 9}` in `GET /api/health`.
 
 ---
 

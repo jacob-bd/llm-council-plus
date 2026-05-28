@@ -31,6 +31,7 @@ ADVISOR_SETTINGS = {
     "advisor_tiebreaker_model": "",
     "advisor_temperature": 0.7,
     "advisor_default_rounds": 3,
+    "advisor_presets": [],
     "council_models": ["openai:gpt-4.1"],
 }
 
@@ -43,7 +44,7 @@ async def test_list_personas_success(server):
         respx.get("http://test:8001/api/personas").mock(
             return_value=httpx.Response(200, json=PERSONAS)
         )
-        result = await server.call_tool("list_personas", {})
+        result = await server.call_tool("personas", {"action": "list"})
         data = get_json(result)
     assert isinstance(data, list)
     assert len(data) == 2
@@ -57,7 +58,7 @@ async def test_list_personas_backend_error(server):
         respx.get("http://test:8001/api/personas").mock(
             return_value=httpx.Response(500, text="Internal Server Error")
         )
-        result = await server.call_tool("list_personas", {})
+        result = await server.call_tool("personas", {"action": "list"})
         text = get_text(result)
     assert "Error" in text
 
@@ -70,7 +71,7 @@ async def test_get_persona_found(server):
         respx.get("http://test:8001/api/personas").mock(
             return_value=httpx.Response(200, json=PERSONAS)
         )
-        result = await server.call_tool("get_persona", {"persona_id": "skeptic"})
+        result = await server.call_tool("personas", {"action": "get", "persona_id": "skeptic"})
         data = get_json(result)
     assert data["id"] == "skeptic"
     assert data["name"] == "The Skeptic"
@@ -83,7 +84,7 @@ async def test_get_persona_not_found(server):
         respx.get("http://test:8001/api/personas").mock(
             return_value=httpx.Response(200, json=PERSONAS)
         )
-        result = await server.call_tool("get_persona", {"persona_id": "nonexistent"})
+        result = await server.call_tool("personas", {"action": "get", "persona_id": "nonexistent"})
         text = get_text(result)
     assert "not found" in text.lower()
 
@@ -97,7 +98,7 @@ async def test_update_persona_name_only(server):
         respx.patch("http://test:8001/api/personas/skeptic").mock(
             return_value=httpx.Response(200, json=updated)
         )
-        result = await server.call_tool("update_persona", {
+        result = await server.call_tool("personas", {"action": "update", 
             "persona_id": "skeptic",
             "name": "Super Skeptic",
         })
@@ -113,7 +114,7 @@ async def test_update_persona_system_prompt(server):
         respx.patch("http://test:8001/api/personas/skeptic").mock(
             return_value=httpx.Response(200, json=updated)
         )
-        result = await server.call_tool("update_persona", {
+        result = await server.call_tool("personas", {"action": "update", 
             "persona_id": "skeptic",
             "system_prompt": "New prompt",
         })
@@ -123,9 +124,9 @@ async def test_update_persona_system_prompt(server):
 
 @pytest.mark.asyncio
 async def test_update_persona_no_fields_provided(server):
-    result = await server.call_tool("update_persona", {"persona_id": "skeptic"})
+    result = await server.call_tool("personas", {"action": "update", "persona_id": "skeptic"})
     text = get_text(result)
-    assert "No fields provided" in text
+    assert "provide at least one field" in text
 
 
 @pytest.mark.asyncio
@@ -134,12 +135,12 @@ async def test_update_persona_not_found(server):
         respx.patch("http://test:8001/api/personas/ghost").mock(
             return_value=httpx.Response(404, json={"detail": "Persona not found"})
         )
-        result = await server.call_tool("update_persona", {
+        result = await server.call_tool("personas", {"action": "update", 
             "persona_id": "ghost",
             "name": "Ghost",
         })
-        text = get_text(result)
-    assert "Error" in text
+        data = get_json(result)
+    assert data["status"] == "error"
 
 
 # ── reset_persona ─────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ async def test_reset_persona_success(server):
         respx.delete("http://test:8001/api/personas/skeptic/override").mock(
             return_value=httpx.Response(200, json=restored)
         )
-        result = await server.call_tool("reset_persona", {"persona_id": "skeptic"})
+        result = await server.call_tool("personas", {"action": "reset", "persona_id": "skeptic"})
         data = get_json(result)
     assert data["is_customized"] is False
     assert data["id"] == "skeptic"
@@ -163,9 +164,9 @@ async def test_reset_persona_not_found(server):
         respx.delete("http://test:8001/api/personas/ghost/override").mock(
             return_value=httpx.Response(404, json={"detail": "Persona not found"})
         )
-        result = await server.call_tool("reset_persona", {"persona_id": "ghost"})
-        text = get_text(result)
-    assert "Error" in text
+        result = await server.call_tool("personas", {"action": "reset", "persona_id": "ghost"})
+        data = get_json(result)
+    assert data["status"] == "error"
 
 
 # ── get_advisor_config ────────────────────────────────────────────────────────
@@ -176,12 +177,13 @@ async def test_get_advisor_config_returns_only_advisor_fields(server):
         respx.get("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json=ADVISOR_SETTINGS)
         )
-        result = await server.call_tool("get_advisor_config", {})
+        result = await server.call_tool("advisor_settings", {"action": "get"})
         data = get_json(result)
     assert "advisor_default_model" in data
     assert "advisor_tiebreaker_model" in data
     assert "advisor_temperature" in data
     assert "advisor_default_rounds" in data
+    assert "advisor_presets" in data
     # Council fields should NOT be included
     assert "council_models" not in data
 
@@ -192,7 +194,7 @@ async def test_get_advisor_config_values(server):
         respx.get("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json=ADVISOR_SETTINGS)
         )
-        result = await server.call_tool("get_advisor_config", {})
+        result = await server.call_tool("advisor_settings", {"action": "get"})
         data = get_json(result)
     assert data["advisor_default_model"] == "openai:gpt-4.1"
     assert data["advisor_temperature"] == 0.7
@@ -210,7 +212,7 @@ async def test_configure_advisors_single_field(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json={**ADVISOR_SETTINGS, "advisor_default_rounds": 3})
         )
-        result = await server.call_tool("configure_advisors", {"default_rounds": 3})
+        result = await server.call_tool("advisor_settings", {"action": "update", "default_rounds": 3})
         text = get_text(result)
     assert "updated" in text.lower()
     assert "advisor_default_rounds" in text
@@ -218,7 +220,7 @@ async def test_configure_advisors_single_field(server):
 
 @pytest.mark.asyncio
 async def test_configure_advisors_rejects_default_rounds_below_three(server):
-    result = await server.call_tool("configure_advisors", {"default_rounds": 2})
+    result = await server.call_tool("advisor_settings", {"action": "update", "default_rounds": 2})
     text = get_text(result)
     assert "default_rounds must be between 3 and 10" in text
 
@@ -232,7 +234,7 @@ async def test_configure_advisors_multiple_fields(server):
         respx.put("http://test:8001/api/settings").mock(
             return_value=httpx.Response(200, json=ADVISOR_SETTINGS)
         )
-        result = await server.call_tool("configure_advisors", {
+        result = await server.call_tool("advisor_settings", {"action": "update", 
             "default_model": "anthropic:claude-sonnet-4-6",
             "temperature": 0.5,
         })
@@ -242,9 +244,9 @@ async def test_configure_advisors_multiple_fields(server):
 
 @pytest.mark.asyncio
 async def test_configure_advisors_no_fields_provided(server):
-    result = await server.call_tool("configure_advisors", {})
+    result = await server.call_tool("advisor_settings", {"action": "update"})
     text = get_text(result)
-    assert "No fields provided" in text
+    assert "no update fields" in text
 
 
 # ── run_advisor_debate ────────────────────────────────────────────────────────
@@ -290,7 +292,7 @@ async def test_run_advisor_debate_success(server):
             return_value=httpx.Response(200, text=sse_body,
                                         headers={"content-type": "text/event-stream"})
         )
-        result = await server.call_tool("run_advisor_debate", {
+        result = await server.call_tool("advisor_debate", {
             "question": "What is the best approach?",
             "persona_ids": ["skeptic", "pragmatist"],
         })
@@ -319,7 +321,7 @@ async def test_run_advisor_debate_with_search(server):
             return_value=httpx.Response(200, text=sse_body,
                                         headers={"content-type": "text/event-stream"})
         )
-        result = await server.call_tool("run_advisor_debate", {
+        result = await server.call_tool("advisor_debate", {
             "question": "Best approach?",
             "persona_ids": ["skeptic", "pragmatist"],
             "search_provider": "duckduckgo",
@@ -333,7 +335,7 @@ async def test_run_advisor_debate_with_search(server):
 
 @pytest.mark.asyncio
 async def test_run_advisor_debate_too_few_personas(server):
-    result = await server.call_tool("run_advisor_debate", {
+    result = await server.call_tool("advisor_debate", {
         "question": "Test?",
         "persona_ids": ["skeptic"],
     })
@@ -343,7 +345,7 @@ async def test_run_advisor_debate_too_few_personas(server):
 
 @pytest.mark.asyncio
 async def test_run_advisor_debate_too_many_personas(server):
-    result = await server.call_tool("run_advisor_debate", {
+    result = await server.call_tool("advisor_debate", {
         "question": "Test?",
         "persona_ids": ["skeptic", "pragmatist", "innovator", "historian", "ethicist"],
     })
@@ -353,7 +355,7 @@ async def test_run_advisor_debate_too_many_personas(server):
 
 @pytest.mark.asyncio
 async def test_run_advisor_debate_invalid_rounds(server):
-    result = await server.call_tool("run_advisor_debate", {
+    result = await server.call_tool("advisor_debate", {
         "question": "Test?",
         "persona_ids": ["skeptic", "pragmatist"],
         "max_rounds": 0,
@@ -365,7 +367,7 @@ async def test_run_advisor_debate_invalid_rounds(server):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("invalid_rounds", [1, 2])
 async def test_run_advisor_debate_rejects_rounds_below_three(server, invalid_rounds):
-    result = await server.call_tool("run_advisor_debate", {
+    result = await server.call_tool("advisor_debate", {
         "question": "Test?",
         "persona_ids": ["skeptic", "pragmatist"],
         "max_rounds": invalid_rounds,
@@ -380,7 +382,7 @@ async def test_run_advisor_debate_network_error(server):
         respx.post("http://test:8001/api/conversations").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
-        result = await server.call_tool("run_advisor_debate", {
+        result = await server.call_tool("advisor_debate", {
             "question": "Test?",
             "persona_ids": ["skeptic", "pragmatist"],
         })

@@ -184,6 +184,7 @@ Fine-tune creativity vs consistency per stage:
 - **Live Progress Tracking** — See each model or advisor respond in real-time with streaming
 - **Multi-turn Conversations** — Follow-up questions carry full context automatically
 - **Council Sizing** — Adjust council from 1 to 8 models; advisors from 2 to 4 personas
+- **Advisor Presets** — Save and load named advisor lineups (personas, model mode, optional rounds/web search) from Advisor Setup
 - **Abort Anytime** — Cancel in-progress requests
 - **Conversation History** — All conversations saved locally with search
 - **Customizable System Prompts** — Edit Stage 1, 2, and 3 prompts for Council mode
@@ -262,11 +263,15 @@ Remote admin endpoints (`/api/settings/export`, `/api/settings/import`, `/api/se
 
 On first launch, configure at least one LLM provider in Settings:
 
-1. **LLM API Keys** — Enter API keys for your chosen providers
-2. **Council Config** — Select council members and chairman
-3. **Save Changes**
+1. **LLM API Keys** — Enter API keys for your chosen providers (and Ollama URL / custom endpoint if used)
+2. **Council Config** (Settings) or **welcome-screen Council Setup** — add members and chairman; both edit the same saved lineup
+3. **Save Changes** (Settings only — welcome screen auto-saves)
 
 API keys **auto-save** when you click "Test" and the connection succeeds.
+
+**Provider toggles vs Advisors:** Settings → Council Config **Remote/Local toggles** filter which sources appear in **council** model pickers only. **LLM Advisors** use every configured provider (saved API keys + Ollama URL + custom endpoint) regardless of those toggles.
+
+**Advisor presets:** In Advisor Setup, save named lineups (personas, models, optional rounds/web search) from the Model Assignment section. Presets persist in `settings.json` as `advisor_presets` (max 20; one default).
 
 ### LLM API Keys
 
@@ -305,12 +310,12 @@ Connect to any OpenAI-compatible API:
 
 LLM Council Plus exposes a powerful Model Context Protocol (MCP) server that lets AI tools like Claude Code and Gemini CLI interact directly with your local or remote instance.
 
-The server exposes **25 tools** grouped into five categories:
-1. **Council Management**: Configure members, chairman, temperatures, search providers, and set API keys.
-2. **Deliberation**: Run parallel 3-stage deliberations, quick stateless chats, or multi-turn stateful conversations.
-3. **Advisor & Persona Management**: Run multi-round debates with custom verdicts, customize system prompts, emojis, and roles for all 10 advisor personas.
-4. **Conversation Management**: List past sessions and retrieve full transcript logs.
-5. **System Health**: Check backend connectivity and test specific LLM provider connections on the fly.
+The server exposes **9 action-based tools** grouped by domain:
+1. **Deliberation**: `council_deliberate` (stage1/stage2/stage3/full), `model_chat` (quick/multi_turn), `advisor_debate`
+2. **Configuration**: `council_settings`, `advisor_settings`, `personas`, `providers`, `config_backup`
+3. **History**: `conversations` (list/get)
+
+Legacy 25-tool names were removed in v0.5.2 — see [docs/mcp/TOOLS.md](docs/mcp/TOOLS.md) for the action parameter on each tool.
 
 **Quick registration for Claude Code:**
 
@@ -325,15 +330,15 @@ The server exposes **25 tools** grouped into five categories:
   claude mcp add llm-council --url http://yourserver.com:8001/mcp/sse
   ```
 
-Then ask Claude: "check the council health" to verify the connection.
+Then ask Claude: "check the council health" to verify the connection (`providers` → action `health`; expect 9 tools in `/api/health`).
 
 See **[docs/mcp/](docs/mcp/)** for full setup guides, including stdio/SSE transport configurations, complete tools reference, and usage examples.
 
 ---
 
-## Claude Code Skill (No MCP Required)
+## Claude Code Skill (REST fallback)
 
-If MCP isn't available or you prefer direct HTTP access, install the **`llm-council-api` skill** for Claude Code:
+When MCP isn't available or you need preset CRUD / raw SSE, install the **`llm-council-api` skill**. When **both** skill and MCP are present, agents should **use MCP tools first** — the skill documents REST as fallback.
 
 ```bash
 # Symlink from your cloned repo
@@ -342,6 +347,8 @@ ln -s "$(pwd)/skills/llm-council-api" ~/.claude/skills/llm-council-api
 ```
 
 The skill covers all API endpoints, SSE stream parsing, advisor endpoints, and troubleshooting. See [`skills/llm-council-api/SKILL.md`](skills/llm-council-api/SKILL.md) for the full reference.
+
+Contributors: keep REST API, MCP tools, skill, and user docs in sync — see [`docs/DOC-SYNC.md`](docs/DOC-SYNC.md).
 
 ---
 
@@ -388,7 +395,8 @@ data/
 - Backend might still be starting up — the app retries automatically
 
 **Models not appearing in dropdown**
-- Ensure the provider is enabled in Council Config
+- **Council (Settings → Council Config):** Ensure the provider toggle is enabled for that source
+- **Advisors (Advisor Setup):** Toggles do not apply — configure API keys / Ollama URL / custom endpoint under **LLM API Keys** instead
 - Check that API key is configured and tested successfully
 - For Ollama, verify connection is active
 

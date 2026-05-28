@@ -325,7 +325,7 @@ def add_error_message(conversation_id: str, error_text: str):
         "content": None,
         "error": error_text,
         "stage1": [],
-        "stage2": [],
+        "stage2": None,
         "stage3": None
     }
 

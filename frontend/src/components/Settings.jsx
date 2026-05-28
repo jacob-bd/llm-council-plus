@@ -26,6 +26,32 @@ const buildPromptValues = (source = {}, fallback = '') => (
   Object.fromEntries(PROMPT_FIELDS.map(key => [key, source[key] ?? fallback]))
 );
 
+const hasAnyDirectKey = (data) => !!(
+  data?.openai_api_key_set
+  || data?.anthropic_api_key_set
+  || data?.google_api_key_set
+  || data?.mistral_api_key_set
+  || data?.deepseek_api_key_set
+  || data?.nvidia_api_key_set
+);
+
+/** Council toggles cannot be ON for providers that have no credentials. */
+const normalizeEnabledProviders = (enabledProviders, data, ollamaConnected) => ({
+  openrouter: !!enabledProviders?.openrouter && !!data?.openrouter_api_key_set,
+  ollama: !!enabledProviders?.ollama && !!ollamaConnected,
+  groq: !!enabledProviders?.groq && !!data?.groq_api_key_set,
+  direct: !!enabledProviders?.direct && hasAnyDirectKey(data),
+  custom: !!enabledProviders?.custom && !!data?.custom_endpoint_url,
+});
+
+const normalizeDirectProviderToggles = (toggles, data) => ({
+  openai: !!toggles?.openai && !!data?.openai_api_key_set,
+  anthropic: !!toggles?.anthropic && !!data?.anthropic_api_key_set,
+  google: !!toggles?.google && !!data?.google_api_key_set,
+  mistral: !!toggles?.mistral && !!data?.mistral_api_key_set,
+  deepseek: !!toggles?.deepseek && !!data?.deepseek_api_key_set,
+  nvidia: !!toggles?.nvidia && !!data?.nvidia_api_key_set,
+});
 
 export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initialSection = 'llm_keys' }) {
   const [activeSection, setActiveSection] = useState(initialSection);
@@ -366,36 +392,40 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setSearchHybridMode(data.search_hybrid_mode ?? true);
       setShowFreeOnly(data.show_free_only ?? false);
 
-      // Enabled Providers - use saved settings if available, otherwise auto-enable based on configured keys
+      // Enabled Providers — never show ON for sources that aren't configured
       if (data.enabled_providers) {
-        // User has explicitly set their preferences - use them
-        setEnabledProviders(data.enabled_providers);
+        setEnabledProviders(normalizeEnabledProviders(
+          data.enabled_providers,
+          data,
+          ollamaStatus?.connected
+        ));
       } else {
-        // First time or no saved preferences - auto-enable based on what's configured
-        const hasDirectConfigured = !!(data.openai_api_key_set || data.anthropic_api_key_set ||
-          data.google_api_key_set || data.mistral_api_key_set || data.deepseek_api_key_set);
+        const hasDirectConfigured = hasAnyDirectKey(data);
 
-        setEnabledProviders({
+        setEnabledProviders(normalizeEnabledProviders({
           openrouter: !!data.openrouter_api_key_set || (!hasDirectConfigured && !ollamaStatus?.connected && !data.groq_api_key_set),
           ollama: ollamaStatus?.connected || false,
           groq: !!data.groq_api_key_set,
-          direct: hasDirectConfigured
-        });
+          direct: hasDirectConfigured,
+          custom: !!data.custom_endpoint_url,
+        }, data, ollamaStatus?.connected));
       }
 
       // Individual direct provider toggles - load from saved settings
       if (data.direct_provider_toggles) {
-        setDirectProviderToggles(data.direct_provider_toggles);
+        setDirectProviderToggles(normalizeDirectProviderToggles(
+          data.direct_provider_toggles,
+          data
+        ));
       } else {
-        // Fallback for first-time users: auto-enable if API key is configured
-        setDirectProviderToggles({
+        setDirectProviderToggles(normalizeDirectProviderToggles({
           openai: !!data.openai_api_key_set,
           anthropic: !!data.anthropic_api_key_set,
           google: !!data.google_api_key_set,
           mistral: !!data.mistral_api_key_set,
           deepseek: !!data.deepseek_api_key_set,
           nvidia: !!data.nvidia_api_key_set,
-        });
+        }, data));
       }
 
       // Council Configuration (unified)
@@ -1189,11 +1219,18 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         if (config.show_free_only !== undefined) setShowFreeOnly(config.show_free_only);
 
         // Apply Enabled Providers
-        if (config.enabled_providers) {
-          setEnabledProviders(config.enabled_providers);
+        if (config.enabled_providers && settings) {
+          setEnabledProviders(normalizeEnabledProviders(
+            config.enabled_providers,
+            settings,
+            ollamaStatus?.connected
+          ));
         }
-        if (config.direct_provider_toggles) {
-          setDirectProviderToggles(config.direct_provider_toggles);
+        if (config.direct_provider_toggles && settings) {
+          setDirectProviderToggles(normalizeDirectProviderToggles(
+            config.direct_provider_toggles,
+            settings
+          ));
         }
 
         // Apply Council Configuration (unified)
@@ -1426,7 +1463,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     // 2. If it's NOT OpenRouter (Direct, Ollama, Custom), keep it visible.
     return all.filter(m => {
       // Check if it's an OpenRouter model
-      const isOpenRouter = m.source === 'openrouter' || m.provider === 'OpenRouter' || m.id.startsWith('openrouter:') || m.id.includes('/');
+      const isOpenRouter = m.source === 'openrouter' || m.provider === 'OpenRouter' || m.id.startsWith('openrouter:');
 
       // If it is OpenRouter, apply the free filter
       if (isOpenRouter) {

@@ -424,7 +424,24 @@ export const api = {
    * @returns {Promise<void>}
    */
   async sendMessageStream(conversationId, options, onEvent, signal) {
-    const { content, searchProvider = null, executionMode = 'full' } = options;
+    const {
+      content,
+      searchProvider = null,
+      executionMode = 'full',
+      councilModels = null,
+      chairmanModel = null,
+    } = options;
+    const body = {
+      content,
+      search_provider: searchProvider,
+      execution_mode: executionMode,
+    };
+    if (councilModels && councilModels.length > 0) {
+      body.council_models = councilModels;
+    }
+    if (chairmanModel) {
+      body.chairman_model = chairmanModel;
+    }
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
       {
@@ -433,7 +450,7 @@ export const api = {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
         },
-        body: JSON.stringify({ content, search_provider: searchProvider, execution_mode: executionMode }),
+        body: JSON.stringify(body),
         signal,
         cache: 'no-store',
       }

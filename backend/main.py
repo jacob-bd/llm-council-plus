@@ -322,7 +322,7 @@ async def health_check(request: Request):
         "service": "LLM Council API",
         "mcp": {
             "sse_url": f"{scheme}://{host}/mcp/sse",
-            "tools": 25,
+            "tools": 9,
         },
     }
 
@@ -884,6 +884,8 @@ class UpdateSettingsRequest(BaseModel):
     advisor_cross_pollination_prompt: Optional[str] = None
     advisor_verdict_prompt: Optional[str] = None
     advisor_tiebreaker_prompt: Optional[str] = None
+    advisor_presets: Optional[List[Dict[str, Any]]] = None
+    council_presets: Optional[List[Dict[str, Any]]] = None
 
 
 
@@ -957,6 +959,8 @@ async def get_app_settings():
         "advisor_cross_pollination_prompt": settings.advisor_cross_pollination_prompt,
         "advisor_verdict_prompt": settings.advisor_verdict_prompt,
         "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
+        "advisor_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.advisor_presets],
+        "council_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.council_presets],
     }
 
 
@@ -1163,6 +1167,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
         updates["advisor_verdict_prompt"] = request.advisor_verdict_prompt
     if request.advisor_tiebreaker_prompt is not None:
         updates["advisor_tiebreaker_prompt"] = request.advisor_tiebreaker_prompt
+    if request.advisor_presets is not None:
+        from .settings import _normalize_advisor_presets
+        updates["advisor_presets"] = _normalize_advisor_presets(request.advisor_presets)
+    if request.council_presets is not None:
+        from .settings import _normalize_council_presets
+        updates["council_presets"] = _normalize_council_presets(request.council_presets)
 
     if updates:
         settings = update_settings(**updates)
@@ -1223,6 +1233,8 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "advisor_cross_pollination_prompt": settings.advisor_cross_pollination_prompt,
         "advisor_verdict_prompt": settings.advisor_verdict_prompt,
         "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
+        "advisor_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.advisor_presets],
+        "council_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.council_presets],
     }
 
 

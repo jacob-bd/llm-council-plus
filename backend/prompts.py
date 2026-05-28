@@ -35,12 +35,12 @@ Example of the correct format for your ENTIRE response:
 
 Response A provides good detail on X but misses Y...
 Response B is accurate but lacks depth on Z...
-Response C offers the most comprehensive answer...
 
 FINAL RANKING:
-1. Response C
-2. Response A
-3. Response B
+1. Response A
+2. Response B
+
+Rank ONLY the responses listed above. Do not invent labels that were not provided.
 
 Now provide your evaluation and ranking:"""
 

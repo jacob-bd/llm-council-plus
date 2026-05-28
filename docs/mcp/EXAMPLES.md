@@ -12,12 +12,13 @@ These walkthroughs show real interactions between a user, their AI assistant, an
 
 **What happens behind the scenes:**
 
-The AI recognizes this as a full deliberation request and calls `run_deliberation`:
+The AI recognizes this as a full deliberation request and calls `council_deliberate`:
 
 ```json
 {
-  "tool": "run_deliberation",
+  "tool": "council_deliberate",
   "input": {
+    "action": "full",
     "query": "What are the pros and cons of microservices architecture?",
     "web_search": true
   }
@@ -73,7 +74,7 @@ The AI surfaces the `chairman_answer` as the primary response and may offer to s
 The AI first checks what models are available:
 
 ```json
-{"tool": "list_models", "input": {}}
+{"tool": "providers", "input": {"action": "list_models"}}
 ```
 
 Response (abbreviated):
@@ -88,12 +89,13 @@ Response (abbreviated):
 }
 ```
 
-The AI then maps your request to available model IDs and calls `configure_council`:
+The AI then maps your request to available model IDs and calls `council_settings`:
 
 ```json
 {
-  "tool": "configure_council",
+  "tool": "council_settings",
   "input": {
+    "action": "update",
     "models": [
       "openai:gpt-4.1",
       "openrouter:anthropic/claude-sonnet-4",
@@ -107,16 +109,8 @@ The AI then maps your request to available model IDs and calls `configure_counci
 Response:
 ```json
 {
-  "success": true,
-  "config": {
-    "council_members": [
-      "openai:gpt-4.1",
-      "openrouter:anthropic/claude-sonnet-4",
-      "openrouter:google/gemini-pro-1.5"
-    ],
-    "chairman": "anthropic:claude-opus-4",
-    "execution_mode": "full"
-  }
+  "status": "updated",
+  "fields": ["council_models", "execution_mode"]
 }
 ```
 
@@ -136,12 +130,13 @@ Note: The AI picks the closest available model IDs. If a model you named is not 
 
 **What happens behind the scenes:**
 
-The AI recognizes you want a direct single-model response, not a full deliberation, and calls `quick_chat`:
+The AI recognizes you want a direct single-model response, not a full deliberation, and calls `model_chat`:
 
 ```json
 {
-  "tool": "quick_chat",
+  "tool": "model_chat",
   "input": {
+    "action": "quick",
     "query": "What's the difference between REST and GraphQL?",
     "model": "openai:gpt-4.1",
     "web_search": false
@@ -163,7 +158,7 @@ Response:
 
 **What your AI presents to you:**
 
-The AI presents the response directly, typically as a formatted answer. Because this is `quick_chat` (single model, no deliberation), there are no rankings or chairman synthesis — you get the raw model output immediately.
+The AI presents the response directly, typically as a formatted answer. Because this is `model_chat` with action `quick` (single model, no deliberation), there are no rankings or chairman synthesis — you get the raw model output immediately.
 
 ---
 
@@ -175,12 +170,13 @@ The AI presents the response directly, typically as a formatted answer. Because 
 
 **What happens behind the scenes (first call):**
 
-The AI uses the `chat` tool to start a new conversation:
+The AI uses `model_chat` with action `multi_turn` to start a new conversation:
 
 ```json
 {
-  "tool": "chat",
+  "tool": "model_chat",
   "input": {
+    "action": "multi_turn",
     "query": "How does async/await work in Python?",
     "model": "anthropic:claude-sonnet-4"
   }
@@ -208,8 +204,9 @@ The AI passes the same `conversation_id` to continue the conversation:
 
 ```json
 {
-  "tool": "chat",
+  "tool": "model_chat",
   "input": {
+    "action": "multi_turn",
     "query": "Can you show me a concrete example with aiohttp?",
     "model": "anthropic:claude-sonnet-4",
     "conversation_id": "conv-abc-123"
@@ -223,7 +220,7 @@ The model receives the full prior conversation as context and responds with a re
 - The `conversation_id` links follow-up messages to the same conversation
 - The model sees all prior user/assistant turns automatically
 - No need to repeat context or re-explain — the model remembers
-- For one-off questions without memory, use `quick_chat` instead
+- For one-off questions without memory, use `model_chat` with action `quick` instead
 
 ---
 
@@ -298,8 +295,9 @@ The AI updates the system prompt and description of the `skeptic` persona:
 
 ```json
 {
-  "tool": "update_persona",
+  "tool": "personas",
   "input": {
+    "action": "update",
     "persona_id": "skeptic",
     "role": "Security Auditor & Skeptic",
     "description": "Examines proposals exclusively through the lens of OWASP Top 10, data leaks, and access controls.",
@@ -329,8 +327,9 @@ The AI then confirms:
 Behind the scenes:
 ```json
 {
-  "tool": "reset_persona",
+  "tool": "personas",
   "input": {
+    "action": "reset",
     "persona_id": "skeptic"
   }
 }
@@ -346,12 +345,13 @@ Behind the scenes:
 
 **What happens behind the scenes:**
 
-The AI calls `configure_advisors`:
+The AI calls `advisor_settings`:
 
 ```json
 {
-  "tool": "configure_advisors",
+  "tool": "advisor_settings",
   "input": {
+    "action": "update",
     "default_model": "custom:deepseek-v4-flash-free",
     "default_rounds": 4
   }
@@ -359,13 +359,45 @@ The AI calls `configure_advisors`:
 ```
 
 Response:
-```
-Advisor config updated:
-  advisor_default_model: custom:deepseek-v4-flash-free
-  advisor_default_rounds: 4
+```json
+{
+  "status": "updated",
+  "fields": ["advisor_default_model", "advisor_default_rounds"]
+}
 ```
 
 **What your AI presents to you:**
 
 > "All advisor debates will now default to running 4 rounds of back-and-forth statements using the custom `deepseek-v4-flash-free` model. Ready to start a debate session?"
+
+---
+
+## Example 8: Save an advisor preset (MCP)
+
+**What you say to your AI:**
+
+> "Save my current advisor lineup as a preset called Startup Panel with The Skeptic, Pragmatist, and Innovator on gpt-4.1."
+
+**What happens behind the scenes:**
+
+The AI calls `advisor_settings` with action `save_preset`:
+
+```json
+{
+  "tool": "advisor_settings",
+  "input": {
+    "action": "save_preset",
+    "preset_name": "Startup Panel",
+    "persona_ids": ["skeptic", "pragmatist", "innovator"],
+    "default_model": "openai:gpt-4.1",
+    "is_default": true
+  }
+}
+```
+
+**What your AI presents to you:**
+
+> "Saved Startup Panel as your default advisor preset. Open Advisor Setup to load it on future debates."
+
+See `skills/llm-council-api/SKILL.md` §18 for the full preset schema (max 20 presets; saves personas/models/rounds/search — not the debate question). REST fallback: `PUT /api/settings` with `advisor_presets`.
 

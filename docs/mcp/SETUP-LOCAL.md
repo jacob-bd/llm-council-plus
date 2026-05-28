@@ -76,13 +76,18 @@ Start a new conversation in Claude Code or Gemini CLI and ask:
 
 > "Check the council health"
 
-The AI will call the `check_health` tool. A successful response looks like:
+The AI will call `providers` with action `health`. A successful response looks like:
 
+```json
+{
+  "backend": "reachable",
+  "base_url": "http://localhost:8001",
+  "council_models": ["openai:gpt-4.1", "..."],
+  "configured_providers": ["openai", "anthropic"]
+}
 ```
-Backend is reachable at http://localhost:8001
-Providers configured: openrouter, anthropic
-Council members: 3 models selected
-```
+
+Confirm the backend advertises 9 MCP tools: `GET /api/health` → `"mcp": {"tools": 9}`.
 
 ---
 

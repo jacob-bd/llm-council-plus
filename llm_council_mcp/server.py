@@ -3,10 +3,11 @@
 from mcp.server.fastmcp import FastMCP
 
 from .tools import advisors as advisors_tools
+from .tools import config_backup as config_backup_tools
 from .tools import conversations as conversations_tools
 from .tools import council as council_tools
 from .tools import deliberation as deliberation_tools
-from .tools import health as health_tools
+from .tools import providers as providers_tools
 
 
 def create_server(
@@ -14,39 +15,31 @@ def create_server(
     host: str = "0.0.0.0",
     port: int = 8002,
 ) -> FastMCP:
-    """Create and configure the LLM Council Plus MCP server.
-
-    Args:
-        base_url: Base URL of the LLM Council Plus backend REST API.
-        host: Host to bind when running in SSE transport mode.
-        port: Port to bind when running in SSE transport mode.
-
-    Returns:
-        Configured FastMCP instance with base_url stored as an attribute.
-    """
+    """Create and configure the LLM Council Plus MCP server."""
     server = FastMCP(
         name="llm-council-plus",
         instructions=(
-            "LLM Council Plus — a multi-LLM deliberation and advisor debate system. "
-            "Council mode: 3-stage deliberation (individual responses → peer ranking → synthesis). "
-            "Advisor mode: named personas debate a question across configurable rounds, reaching "
-            "consensus or delivering a structured verdict. "
-            "Use council tools for deliberations, advisor tools for persona-driven debates, "
-            "conversation tools to inspect history, and health tools to check system status."
+            "LLM Council Plus — 9 MCP tools with action parameters. "
+            "Run: council_deliberate (stage1|stage2|stage3|full), model_chat (quick|multi_turn), "
+            "advisor_debate. "
+            "Config: council_settings, advisor_settings (each: get|update|list_presets|"
+            "save_preset|delete_preset|set_default_preset), personas (list|get|update|reset), "
+            "conversations (list|get), providers (list_models|health|test|set_api_key|set_search), "
+            "config_backup (export|import|reset). "
+            "Prefer these MCP tools over curl. Full REST reference: skills/llm-council-api/SKILL.md."
         ),
         host=host,
         port=port,
     )
 
-    # Attach base_url so tool modules can retrieve it via server.base_url
     server.base_url = base_url  # type: ignore[attr-defined]
 
-    # Register tools
-    council_tools.register(server, base_url)
     deliberation_tools.register(server, base_url)
+    council_tools.register(server, base_url)
     advisors_tools.register(server, base_url)
     conversations_tools.register(server, base_url)
-    health_tools.register(server, base_url)
+    providers_tools.register(server, base_url)
+    config_backup_tools.register(server, base_url)
 
     return server
 
@@ -57,11 +50,5 @@ async def run_stdio(server: FastMCP) -> None:
 
 
 async def run_sse(server: FastMCP, host: str = "0.0.0.0", port: int = 8002) -> None:
-    """Run the MCP server using SSE transport (HTTP server mode).
-
-    Note: host and port must be set at create_server() time because FastMCP
-    reads them from its settings object at startup.  If the caller passes
-    different values here they are ignored; this function signature exists
-    for API symmetry with __main__.py — pass host/port to create_server().
-    """
+    """Run the MCP server using SSE transport (HTTP server mode)."""
     await server.run_sse_async()

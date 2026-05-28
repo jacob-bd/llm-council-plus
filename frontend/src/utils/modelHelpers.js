@@ -57,7 +57,16 @@ export const getModelVisuals = (modelId) => {
 
 export const getShortModelName = (modelId) => {
   if (!modelId) return 'Unknown';
-  if (modelId.includes('/')) return modelId.split('/').pop();
-  if (modelId.includes(':')) return modelId.split(':').pop();
-  return modelId;
+
+  let name = modelId.replace(/:free$/, '');
+
+  if (name.includes(':')) {
+    name = name.split(':').slice(1).join(':');
+  }
+
+  if (name.includes('/')) {
+    name = name.split('/').pop();
+  }
+
+  return name;
 };

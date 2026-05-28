@@ -13,6 +13,7 @@ export default function SearchableModelSelect({
   isDisabled = false,
   isLoading = false,
   allModels = null, // Optional: all models to find current value if filtered out
+  autoOpen = false,
 }) {
   // Convert models to react-select format with grouping
   const groupedOptions = models.reduce((acc, model) => {
@@ -196,6 +197,8 @@ export default function SearchableModelSelect({
       isLoading={isLoading}
       isClearable
       isSearchable
+      autoFocus={autoOpen}
+      defaultMenuIsOpen={autoOpen}
       styles={customStyles}
       menuPortalTarget={document.body}
       classNamePrefix="model-select"

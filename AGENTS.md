@@ -31,7 +31,7 @@ npm run dev
 **Ports:**
 - Backend: `http://localhost:8001` (NOT 8000 - avoid conflicts)
 - Frontend: `http://localhost:5173`
-- MCP Server (SSE): Built-in and mounted at `/mcp` on the backend (`http://localhost:8001/mcp/sse`)
+- MCP Server (SSE): Built-in at `/mcp` on the backend (`http://localhost:8001/mcp/sse`) — **9 action-based tools** (`council_deliberate`, `model_chat`, `advisor_debate`, `council_settings`, `advisor_settings`, `personas`, `conversations`, `providers`, `config_backup`). See [`docs/mcp/TOOLS.md`](docs/mcp/TOOLS.md). `GET /api/health` reports `"mcp": {"tools": 9}`.
 
 **Network Access:**
 ```bash
@@ -94,6 +94,7 @@ This fixes binary incompatibilities (e.g., `@rollup/rollup-darwin-*` variants).
 | `Stage2.jsx` | Peer rankings with de-anonymization, aggregate scores |
 | `Stage3.jsx` | Chairman synthesis (final answer) |
 | `CouncilGrid.jsx` | Visual grid of council members with provider icons |
+| `CouncilSetup.jsx` | Inline council editor on welcome screen (members, chairman, presets; auto-save) |
 | `Settings.jsx` | 5-section settings: LLM API Keys, Council Config, System Prompts, Search Providers, Backup & Reset |
 | `Sidebar.jsx` | Conversation list with inline delete confirmation |
 | `SearchableModelSelect.jsx` | Searchable dropdown for model selection |
@@ -271,10 +272,20 @@ curl https://your-endpoint.com/v1/models -H "Authorization: Bearer $API_KEY"
 
 **UI Sections** (sidebar navigation):
 1. **LLM API Keys**: OpenRouter, Groq, Ollama, Direct providers, Custom endpoint
-2. **Council Config**: Model selection with Remote/Local toggles, temperature controls, "I'm Feeling Lucky" randomizer
+2. **Council Config**: **Council-only** provider toggles (Remote/Local filters), member/chairman model selection, temperature controls, "I'm Feeling Lucky" randomizer. Toggles do **not** restrict Advisor model pickers.
 3. **System Prompts**: Stage 1 / Stage 2 / Stage 3 are user-editable and persisted in `settings.json` (fields `stage1_prompt` / `stage2_prompt` / `stage3_prompt`, updated via `PUT /api/settings`), each with reset-to-default. The Title and Query prompts (`TITLE_PROMPT_DEFAULT` / query-generation prompt in `backend/prompts.py`) are referenced internally by `generate_conversation_title` and `generate_search_query` and are not yet wired through `PUT /api/settings`; `frontend/src/components/Settings.jsx` has a `title_prompt` field in local state but no persistence path. Fix this end-to-end before claiming five customizable prompt slots.
 4. **Search Providers**: DuckDuckGo, Tavily, Brave, Serper, TinyFish + Jina full content settings
 5. **Backup & Reset**: Import/Export config, reset to defaults
+
+**Council presets** (`council_presets` in `settings.json`): Saved from welcome-screen Council Setup — members + chairman only. Max 20; one default auto-loads. Main screen and Settings edit the same `council_models` / `chairman_model` fields. Lineup locked in a conversation after the first message.
+
+**Advisor presets** (`advisor_presets` in `settings.json`): Saved from Advisor Setup — personas, simple/advanced mode, model assignments, optional rounds/web search. Max 20; one default. See `skills/llm-council-api/SKILL.md`.
+
+**Provider availability (important)**:
+- **Council** model pickers in Settings respect `enabled_providers` and `direct_provider_toggles`.
+- **Advisors** model pickers use every **configured** provider (keys + Ollama URL + custom endpoint), regardless of council toggles.
+
+**Documentation sync**: When changing API, settings fields, MCP tools, or user-facing flows, update all surfaces listed in [`docs/DOC-SYNC.md`](docs/DOC-SYNC.md) in the same PR.
 
 **Auto-Save Behavior**:
 - **Credentials auto-save**: API keys and URLs save immediately on successful test
@@ -325,6 +336,8 @@ When bumping the version, **all** of the following files must be updated togethe
 | `skills/llm-council-api/SKILL.md` | YAML frontmatter `version: x.y.z` |
 
 Always update all three in the same commit. The CHANGELOG drives the canonical version; the UI and skill must match.
+
+**Full documentation sync** (settings fields, MCP tools, advisor/council flows): follow [`docs/DOC-SYNC.md`](docs/DOC-SYNC.md).
 
 ## Future Enhancements
 

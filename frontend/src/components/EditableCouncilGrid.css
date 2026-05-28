@@ -1,0 +1,224 @@
+.council-grid--editable {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 12px auto 8px;
+  padding: 0;
+  overflow: visible;
+  align-self: center;
+}
+
+.council-grid--editable.council-grid--with-chairman {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.council-grid__lineup {
+  display: grid;
+  gap: 14px;
+}
+
+.council-grid--editable .council-card {
+  min-height: 152px;
+  width: 148px;
+  box-sizing: border-box;
+  padding: 20px 10px 12px;
+  z-index: 1;
+  overflow: visible;
+  opacity: 1;
+  animation: none;
+}
+
+.council-grid--editable .council-card.chairman {
+  flex-shrink: 0;
+  align-self: center;
+  width: 148px;
+}
+
+.council-grid--editable .council-card--editing {
+  z-index: 20;
+  min-height: auto;
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.council-grid--editable .council-card--empty {
+  border-style: dashed;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.council-grid--editable .council-card--empty .council-avatar {
+  opacity: 0.55;
+}
+
+.council-card--editable .model-name--placeholder {
+  color: rgba(148, 163, 184, 0.85);
+  font-weight: 500;
+}
+
+.council-card__edit {
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(226, 232, 240, 0.9);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.council-card__edit:hover {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.council-card__edit--chairman:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.council-card__remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  z-index: 2;
+}
+
+.council-card--editable:hover .council-card__remove,
+.council-card--editable:focus-within .council-card__remove {
+  opacity: 1;
+}
+
+.council-card__remove:hover {
+  background: rgba(248, 113, 113, 0.24);
+}
+
+.council-card__picker {
+  position: relative;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 30;
+}
+
+.council-card__picker-close {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.75);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.council-card__picker-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.council-card--add {
+  min-height: 152px;
+  border: 1px dashed rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.06);
+  color: #93c5fd;
+  cursor: pointer;
+  gap: 8px;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  overflow: visible;
+  opacity: 1;
+  animation: none;
+}
+
+.council-card--add:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.55);
+  transform: translateY(-2px);
+}
+
+.council-card--add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.council-card-add-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.council-card-add-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 719px) {
+  .council-grid--editable.council-grid--with-chairman {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .council-grid__lineup {
+    width: 100% !important;
+    max-width: calc(4 * 148px + 3 * 14px);
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .council-grid--editable .council-card,
+  .council-grid--editable .council-card--add {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .council-grid--editable .council-card.chairman {
+    max-width: 220px;
+  }
+}
+
+@media (max-width: 600px) {
+  .council-grid--editable {
+    gap: 10px;
+  }
+
+  .council-grid__lineup {
+    gap: 10px;
+  }
+
+  .council-grid--editable .council-card {
+    min-height: 140px;
+    padding: 16px 8px 10px;
+  }
+
+  .council-card__remove {
+    opacity: 1;
+  }
+}

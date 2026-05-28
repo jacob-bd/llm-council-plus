@@ -1022,6 +1022,12 @@ input:checked+.slider:before {
   background-color: #4a5568;
 }
 
+.toggle-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .toggle-text {
   font-size: 14px;
   font-weight: 500;

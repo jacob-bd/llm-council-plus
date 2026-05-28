@@ -44,6 +44,13 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
 
     // Get visuals for current tab
     const currentVisuals = getModelVisuals(currentRanking?.model);
+    const knownLabels = labelToModel ? new Set(Object.keys(labelToModel)) : null;
+    const parsedRanking = (currentRanking?.parsed_ranking || []).filter(
+        (label) => !knownLabels || knownLabels.has(label)
+    );
+    const anonymizedLabelText = labelToModel
+        ? Object.keys(labelToModel).join(', ')
+        : 'Response A, Response B, etc.';
 
     // Copy functionality
     const [isCopied, setIsCopied] = useState(false);
@@ -81,7 +88,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
 
             <h4>Raw Evaluations</h4>
             <p className="stage-description">
-                Each model evaluated all responses (anonymized as Response A, B, C, etc.) and provided rankings.
+                Each model evaluated all responses (anonymized as {anonymizedLabelText}) and provided rankings.
                 Below, model names are shown in <strong>bold</strong> for readability, but the original evaluation used anonymous labels.
             </p>
 
@@ -170,8 +177,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                             })()}
                         </MarkdownContent>
 
-                        {currentRanking?.parsed_ranking &&
-                            currentRanking.parsed_ranking.length > 0 && (
+                        {parsedRanking.length > 0 && (
                                 <div className="parsed-ranking">
                                     <strong>Extracted Ranking:</strong>
                                     <span className="info-tooltip-container">
@@ -183,7 +189,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                                         </span>
                                     </span>
                                     <ol>
-                                        {currentRanking.parsed_ranking.map((label, i) => (
+                                        {parsedRanking.map((label, i) => (
                                             <li key={i}>
                                                 {labelToModel && labelToModel[label]
                                                     ? getShortModelName(labelToModel[label])

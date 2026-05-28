@@ -47,8 +47,10 @@ The Settings panel opens automatically on first launch.
 2. Pull a model: `ollama pull llama3.1`
 3. Start Ollama: `ollama serve`
 4. In Settings → **LLM API Keys** → Click **Connect** for Ollama
-5. Go to **Council Config** → Enable "Local (Ollama)" → Select models
+5. Go to **Council Config** → Enable "Local (Ollama)" → Select models for your **council**
 6. Click **Save Changes**
+
+> **Advisors:** Once Ollama is connected in LLM API Keys, Advisor Setup lists Ollama models automatically — you do **not** need to enable the council "Local (Ollama)" toggle for advisors.
 
 ### Option C: Use Direct APIs
 1. Get API keys from your preferred providers (OpenAI, Anthropic, Google, etc.)
@@ -61,10 +63,11 @@ The Settings panel opens automatically on first launch.
 
 ## 4. Your First Council Query
 
-1. Click **+ New Council** in the sidebar
-2. Type your question
-3. (Optional) Toggle **Web Search** for real-time grounding
-4. Press **Enter**
+1. Click **+ New Council** in the sidebar (or use the welcome screen)
+2. **Configure your council** on the welcome screen — add members, pick a chairman (Full Deliberation only), or load a preset
+3. Type your question
+4. (Optional) Toggle **Web Search** for real-time grounding
+5. Press **Enter**
 
 Watch as:
 - **Stage 1**: Each council member responds independently
@@ -80,7 +83,8 @@ Watch as:
 3. Configure the debate options:
    - Select 2 to 4 advisor personas (Skeptic, Strategist, Ethicist, etc.)
    - Set the number of back-and-forth rounds (3 to 10)
-   - Choose a default model or assign specific models to individual personas
+   - Choose a default model or assign specific models to individual personas — **all configured providers** appear here (API keys + Ollama + custom endpoint), not just council-enabled toggles
+   - *(Optional)* Save your lineup as a **preset** from Model Assignment (personas, models, rounds, web search — not the debate question)
 4. Click **Start Debate** and watch the advisors debate each other by name, culminating in a structured consensus verdict with a recommended action plan!
 
 ---
@@ -102,6 +106,7 @@ Choose your deliberation type and depth:
 
 - **Mix model families** in the council for diverse perspectives (e.g., GPT + Claude + Gemini)
 - **Assign specific models to personas**: Give *The Skeptic* a highly detailed model (like Claude) and *The Pragmatist* a fast model (like Groq)
+- **Advisor presets**: Save recurring panels (e.g., "Startup Review") from Advisor Setup → Model Assignment
 - **Use Groq** for ultra-fast council inference
 - **Use Ollama** for unlimited, free local queries (great for local Chairman synthesis using a model like `granite4:1b`)
 - **"I'm Feeling Lucky"** randomizes your council composition
@@ -114,7 +119,8 @@ Choose your deliberation type and depth:
 
 | Problem | Solution |
 |---------|----------|
-| Models not appearing | Check provider is enabled in Council Config |
+| Council models not appearing | Enable the provider in **Council Config** toggles; verify API key / Ollama connection |
+| Advisor models not appearing | Configure **LLM API Keys** (keys + Ollama URL + custom endpoint). Council toggles do not apply to advisors |
 | Rate limit errors | Use Groq (14k/day) or Ollama (unlimited) |
 | Port conflict | Backend uses 8001, frontend uses 5173 |
 | node_modules errors | `rm -rf frontend/node_modules && npm install --prefix frontend` |

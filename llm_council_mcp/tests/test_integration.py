@@ -119,7 +119,7 @@ async def test_full_deliberation_workflow(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_deliberation", {"query": "What is the capital of France?"})
+        result = await server.call_tool("council_deliberate", {"action": "full", "query": "What is the capital of France?"})
 
     data = get_json(result)
     assert data["conversation_id"] == "conv-integration-1"
@@ -149,7 +149,7 @@ async def test_stage1_only_workflow(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {"query": "What is the capital of France?"})
+        result = await server.call_tool("council_deliberate", {"action": "stage1", "query": "What is the capital of France?"})
 
     data = get_json(result)
     assert data["conversation_id"] == "conv-s1"
@@ -195,7 +195,7 @@ async def test_deliberation_with_one_model_failure(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_deliberation", {"query": "test"})
+        result = await server.call_tool("council_deliberate", {"action": "full", "query": "test"})
 
     data = get_json(result)
     assert data["stage1"]["summary"]["failed"] == 1
@@ -219,7 +219,7 @@ async def test_quick_chat_workflow(server):
 
     with respx.mock:
         respx.post(f"{BASE_URL}/api/ask").mock(side_effect=capture_ask)
-        result = await server.call_tool("quick_chat", {"query": "What is 6x7?", "model": "openai:gpt-4.1"})
+        result = await server.call_tool("model_chat", {"action": "quick", "query": "What is 6x7?", "model": "openai:gpt-4.1"})
 
     data = get_json(result)
     assert data["response"] == "42"
@@ -251,7 +251,7 @@ async def test_health_check_integration(server):
                 "tinyfish_api_key_set": False,
             })
         )
-        result = await server.call_tool("check_health", {})
+        result = await server.call_tool("providers", {"action": "health"})
 
     data = get_json(result)
     assert data["backend"] == "reachable"
@@ -269,14 +269,14 @@ async def test_council_config_roundtrip(server):
         respx.put(f"{BASE_URL}/api/settings").mock(
             return_value=httpx.Response(200, json={"success": True})
         )
-        update_result = await server.call_tool("configure_council", {
+        update_result = await server.call_tool("council_settings", {"action": "update", 
             "models": ["openai:gpt-4.1", "anthropic:claude-sonnet-4", "groq:llama3-70b-8192"],
             "execution_mode": "full",
         })
-    update_text = get_text(update_result)
-    assert "successfully" in update_text.lower()
-    assert "openai:gpt-4.1" in update_text
-    assert "full" in update_text
+    update_data = get_json(update_result)
+    assert update_data["status"] == "updated"
+    assert "council_models" in update_data["fields"]
+    assert "execution_mode" in update_data["fields"]
 
     with respx.mock:
         respx.get(f"{BASE_URL}/api/settings").mock(
@@ -290,7 +290,7 @@ async def test_council_config_roundtrip(server):
                 "search_provider": "duckduckgo",
             })
         )
-        config_result = await server.call_tool("get_council_config", {})
+        config_result = await server.call_tool("council_settings", {"action": "get"})
     config = get_json(config_result)
     assert len(config["council_models"]) == 3
     assert config["execution_mode"] == "full"
@@ -318,7 +318,7 @@ async def test_deliberation_model_override_uses_per_request(server):
             side_effect=capture_stream
         )
         override_models = ["groq:llama3-70b-8192", "ollama:llama3"]
-        result = await server.call_tool("run_deliberation", {
+        result = await server.call_tool("council_deliberate", {"action": "full", 
             "query": "test override",
             "models": override_models,
         })
@@ -341,11 +341,12 @@ async def test_deliberation_model_override_no_settings_on_exception(server):
             side_effect=httpx.ConnectError("connection refused")
         )
 
-        with pytest.raises(Exception):
-            await server.call_tool("run_deliberation", {
-                "query": "test",
-                "models": ["groq:llama3-70b-8192", "ollama:llama3"],
-            })
+        result = await server.call_tool("council_deliberate", {"action": "full", 
+            "query": "test",
+            "models": ["groq:llama3-70b-8192", "ollama:llama3"],
+        })
+        data = get_json(result)
+        assert data["status"] == "error"
 
 
 @pytest.mark.asyncio
@@ -372,7 +373,7 @@ async def test_web_search_context_flows_through_to_result(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage1", {
+        result = await server.call_tool("council_deliberate", {"action": "stage1", 
             "query": "What is the capital of France?",
             "web_search": True,
         })
@@ -429,7 +430,7 @@ async def test_stage2_rankings_aggregate_correctly(server):
                 headers={"content-type": "text/event-stream"},
             )
         )
-        result = await server.call_tool("run_stage2", {"query": "Which approach is better?"})
+        result = await server.call_tool("council_deliberate", {"action": "stage2", "query": "Which approach is better?"})
 
     data = get_json(result)
     assert data["conversation_id"] == "conv-s2-agg"
@@ -450,8 +451,9 @@ async def test_quick_chat_no_response_returns_error(server):
             return_value=httpx.Response(502, json={"detail": "All models failed: timeout"})
         )
 
-        with pytest.raises(Exception):
-            await server.call_tool("quick_chat", {
-                "query": "test",
-                "model": "openai:gpt-4.1",
-            })
+        result = await server.call_tool("model_chat", {"action": "quick", 
+            "query": "test",
+            "model": "openai:gpt-4.1",
+        })
+        data = get_json(result)
+        assert data["status"] == "error"

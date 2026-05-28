@@ -10,7 +10,7 @@
   justify-content: center;
   text-align: center;
   width: 100%;
-  max-width: 800px;
+  max-width: 980px;
   padding: 20px;
   will-change: transform;
   /* Prevent layout shift on load */
@@ -174,6 +174,10 @@
   position: relative;
 }
 
+.stage-scroll-anchor {
+  scroll-margin-top: 24px;
+}
+
 /* Message Cards */
 .message {
   display: flex;
@@ -267,7 +271,7 @@
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
-  max-width: 800px;
+  max-width: 980px;
   z-index: 50;
 }
 
@@ -612,12 +616,37 @@
   font-family: var(--font-ui);
 }
 
+.council-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  margin-bottom: 8px;
+}
+
+.council-error-icon {
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.council-error-text {
+  color: #fecaca;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: var(--font-ui);
+}
+
 /* Chat Interface Styles */
 .welcome-grid-container {
   width: 100%;
-  max-width: 800px;
+  max-width: 980px;
   margin: 2rem auto;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
 }
 
@@ -791,6 +820,27 @@
 .start-session-btn:active {
   transform: translateY(0);
   box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.start-session-btn--secondary {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
+}
+
+.start-session-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+  transform: none;
+}
+
+.start-session-btn--secondary::before {
+  display: none;
 }
 
 .btn-glow {

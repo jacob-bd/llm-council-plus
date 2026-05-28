@@ -4,9 +4,34 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
-from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 from .search import SearchProvider
+
+
+class AdvisorPreset(BaseModel):
+    """Saved advisor debate configuration (personas + models)."""
+    id: str
+    name: str
+    persona_ids: List[str] = Field(default_factory=list)
+    mode: str = "simple"  # "simple" | "advanced"
+    default_model: str = ""
+    tiebreaker_model: str = ""
+    model_assignments: Optional[Dict[str, str]] = None
+    max_rounds: int = 3
+    search_provider: Optional[str] = None
+    is_default: bool = False
+    last_used_at: Optional[str] = None
+
+
+class CouncilPreset(BaseModel):
+    """Saved council lineup (members + chairman only)."""
+    id: str
+    name: str
+    council_models: List[str] = Field(default_factory=list)
+    chairman_model: str = ""
+    is_default: bool = False
+    last_used_at: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +176,8 @@ class Settings(BaseModel):
     advisor_cross_pollination_prompt: str = ADVISOR_CROSS_POLLINATION_PROMPT
     advisor_verdict_prompt: str = ADVISOR_VERDICT_PROMPT
     advisor_tiebreaker_prompt: str = ADVISOR_TIEBREAKER_PROMPT
+    advisor_presets: List[AdvisorPreset] = Field(default_factory=list)
+    council_presets: List[CouncilPreset] = Field(default_factory=list)
 
 
 PROMPT_DEFAULTS = {
@@ -167,6 +194,139 @@ PROMPT_DEFAULTS = {
 }
 
 
+MAX_ADVISOR_PRESETS = 20
+MAX_COUNCIL_PRESETS = 20
+MAX_COUNCIL_MEMBERS = 8
+
+
+def _clamp_advisor_rounds(value: Any, default: int = 3) -> int:
+    if not isinstance(value, int):
+        return default
+    return max(3, min(10, value))
+
+
+def _normalize_advisor_presets(raw_presets: Any) -> List[Dict[str, Any]]:
+    """Validate and sanitize persisted advisor presets."""
+    if not isinstance(raw_presets, list):
+        return []
+
+    normalized: List[Dict[str, Any]] = []
+    default_assigned = False
+
+    for item in raw_presets[:MAX_ADVISOR_PRESETS]:
+        if not isinstance(item, dict):
+            continue
+        preset_id = str(item.get("id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not preset_id or not name:
+            continue
+
+        persona_ids = [
+            str(pid).strip()
+            for pid in (item.get("persona_ids") if isinstance(item.get("persona_ids"), list) else [])
+            if str(pid).strip()
+        ][:4]
+
+        mode = item.get("mode", "simple")
+        if mode not in ("simple", "advanced"):
+            mode = "simple"
+
+        model_assignments = item.get("model_assignments")
+        if model_assignments is not None and not isinstance(model_assignments, dict):
+            model_assignments = None
+        if isinstance(model_assignments, dict):
+            model_assignments = {
+                str(k): str(v)
+                for k, v in model_assignments.items()
+                if str(k).strip() and str(v).strip()
+            }
+
+        search_provider = item.get("search_provider")
+        if search_provider is not None:
+            search_provider = str(search_provider).strip() or None
+
+        is_default = bool(item.get("is_default"))
+        if is_default and default_assigned:
+            is_default = False
+        if is_default:
+            default_assigned = True
+
+        last_used_at = item.get("last_used_at")
+        if last_used_at is not None:
+            last_used_at = str(last_used_at).strip() or None
+
+        try:
+            preset = AdvisorPreset(
+                id=preset_id,
+                name=name[:80],
+                persona_ids=persona_ids,
+                mode=mode,
+                default_model=str(item.get("default_model") or ""),
+                tiebreaker_model=str(item.get("tiebreaker_model") or ""),
+                model_assignments=model_assignments,
+                max_rounds=_clamp_advisor_rounds(item.get("max_rounds")),
+                search_provider=search_provider,
+                is_default=is_default,
+                last_used_at=last_used_at,
+            )
+            normalized.append(preset.model_dump())
+        except Exception:
+            continue
+
+    return normalized
+
+
+def _normalize_council_presets(raw_presets: Any) -> List[Dict[str, Any]]:
+    """Validate and sanitize persisted council presets."""
+    if not isinstance(raw_presets, list):
+        return []
+
+    normalized: List[Dict[str, Any]] = []
+    default_assigned = False
+
+    for item in raw_presets[:MAX_COUNCIL_PRESETS]:
+        if not isinstance(item, dict):
+            continue
+        preset_id = str(item.get("id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not preset_id or not name:
+            continue
+
+        raw_models = item.get("council_models")
+        if not isinstance(raw_models, list):
+            raw_models = []
+        council_models = [
+            str(model_id).strip()
+            for model_id in raw_models
+            if str(model_id).strip()
+        ][:MAX_COUNCIL_MEMBERS]
+
+        is_default = bool(item.get("is_default"))
+        if is_default and default_assigned:
+            is_default = False
+        if is_default:
+            default_assigned = True
+
+        last_used_at = item.get("last_used_at")
+        if last_used_at is not None:
+            last_used_at = str(last_used_at).strip() or None
+
+        try:
+            preset = CouncilPreset(
+                id=preset_id,
+                name=name[:80],
+                council_models=council_models,
+                chairman_model=str(item.get("chairman_model") or ""),
+                is_default=is_default,
+                last_used_at=last_used_at,
+            )
+            normalized.append(preset.model_dump())
+        except Exception:
+            continue
+
+    return normalized
+
+
 def _normalize_prompt_defaults(data: dict) -> dict:
     """Backfill defaults for older settings files that persisted invalid values."""
     normalized = dict(data)
@@ -176,10 +336,10 @@ def _normalize_prompt_defaults(data: dict) -> dict:
             normalized[key] = default
 
     rounds = normalized.get("advisor_default_rounds")
-    if not isinstance(rounds, int) or rounds < 3:
-        normalized["advisor_default_rounds"] = 3
-    elif rounds > 10:
-        normalized["advisor_default_rounds"] = 10
+    normalized["advisor_default_rounds"] = _clamp_advisor_rounds(rounds)
+
+    normalized["advisor_presets"] = _normalize_advisor_presets(normalized.get("advisor_presets"))
+    normalized["council_presets"] = _normalize_council_presets(normalized.get("council_presets"))
     return normalized
 
 
