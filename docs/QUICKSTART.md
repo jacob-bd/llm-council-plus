@@ -133,6 +133,7 @@ Choose your deliberation type and depth:
 - Configure **Web Search** providers (Tavily, Brave) for better results
 - Adjust **Temperature** sliders for creativity control
 - **Export** your council config to share or backup
+- **Enable multi-round debate** — see [Council Debate Config Guide](COUNCIL-DEBATE-CONFIG.md) for a full walkthrough of critique modes, round settings, and real-world examples
 
 For full documentation, see [README.md](README.md).
 
