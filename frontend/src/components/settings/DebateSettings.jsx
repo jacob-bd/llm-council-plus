@@ -85,13 +85,13 @@ export default function DebateSettings({
                         <div className="debate-card-details">
                             <ul className="debate-details-list">
                                 <li>
-                                    <span className="bullet-label">How it works:</span> Models simply read each other's full drafts from the previous round and provide critiques in standard conversational English.
+                                    <span className="bullet-label">Round 1:</span> Each model answers your question independently — no awareness of the others.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Pros & Cons:</span> Fast execution time, lowest token consumption (no extra overhead calls), and highly flexible.
+                                    <span className="bullet-label">Round 2+:</span> Each model receives the Chairman's synthesis from the previous round plus their ranking position, then rewrites their response based on that collective output.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Best for:</span> Creative writing, open-ended brainstorming, rapid queries, or when speed and cost are prioritized.
+                                    <span className="bullet-label">Best for:</span> Most questions. Fastest execution, no extra API calls, and the quality improvement per round is already significant.
                                 </li>
                             </ul>
                         </div>
@@ -125,13 +125,13 @@ export default function DebateSettings({
                         <div className="debate-card-details">
                             <ul className="debate-details-list">
                                 <li>
-                                    <span className="bullet-label">How it works:</span> Before peer reviews start, the backend automatically parses and pre-numbers each response by paragraph (e.g. <code>[Paragraph 1]</code>). Evaluators must cite these specific numbers during their critiques.
+                                    <span className="bullet-label">Round 1:</span> Same as Free-form, but every response is auto-numbered by paragraph (<code>[Para 1]</code>, <code>[Para 2]</code>…) before peer review. Reviewers must cite paragraph numbers in their critiques.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Pros & Cons:</span> Stabilizes model cross-referencing, prevents hallucinated reference locations, and provides organized section-by-section critiques.
+                                    <span className="bullet-label">Round 2+:</span> Each model is shown exactly which of their own paragraphs peers called strong or weak, plus up to 5 top-rated paragraphs from rival models to potentially incorporate.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Best for:</span> Structured essays, multi-part answers, or complex policy/legal analysis where specific sections need rigorous comparison.
+                                    <span className="bullet-label">Best for:</span> Structured essays, multi-part answers, legal/policy analysis — any response that naturally breaks into distinct sections worth critiquing individually.
                                 </li>
                             </ul>
                         </div>
@@ -161,13 +161,13 @@ export default function DebateSettings({
                         <div className="debate-card-details">
                             <ul className="debate-details-list">
                                 <li>
-                                    <span className="bullet-label">How it works:</span> A background agent extracts core factual assertions ("canonical claims") into structured JSON. Evaluators then map individual truth verdicts directly over these claims. The UI renders an interactive, color-coded visual claim map.
+                                    <span className="bullet-label">Before review:</span> The Chairman runs an extra API call to extract factual claims from all responses into structured JSON. Reviewers verdict each claim as strong, weak, or neutral — not the whole response.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Pros & Cons:</span> Maximum factual rigor, isolates exact points of contention, and prevents hand-waving arguments. Adds 1 extra claim-extraction API call per model per round.
+                                    <span className="bullet-label">Round 2+:</span> Each model sees which of their own claims peers rejected, and the top claims from rivals that got strong agreement — so rewrites are targeted at specific disputed facts, not general impressions.
                                 </li>
                                 <li>
-                                    <span className="bullet-label">Best for:</span> Technical auditing, code verification, fact-checking, mathematical proofs, or logical reasoning.
+                                    <span className="bullet-label">Best for:</span> Fact-heavy queries, technical auditing, or any topic where you care about specific factual accuracy rather than overall argument quality. Adds 1 extra API call per round.
                                 </li>
                             </ul>
                         </div>
