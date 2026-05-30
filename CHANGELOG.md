@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - _(none)_
 
+## [0.6.1] - 2026-05-30
+
+### Added
+- **Stage 2 Deliberation Heatmap Matrix** (Ported from PR #179 by @UmaimaKhan01): Added a premium, glassmorphic $N \times N$ matrix detailing anonymous peer evaluation grades ( emerald green 1st, soft amber 2nd, modern crimson 3rd, ruby 4th+).
+- **Segmented UI View Toggle**: Fully responsive segmented tab switcher (`🏆 Leaderboard` vs `📊 Detail Matrix`) to prevent page clutter and let users swap details dynamically.
+- **Auto-Threshold Toggle Control**: Hides the Detail Matrix toggle on low-model runs (less than 3 models) where peer matrices are logically inapplicable, ensuring zero UI clutter.
+
+### Fixed
+- **Clean Lazy Creation State Refactor**: Replaced legacy empty file initialization drafts with a pure client-side lazily created draft state (`'draft'`), completely eliminating orphaned JSON file clutter on user disks.
+- **Heatmap Score Math Alignment**: Aligned the matrix average scoring calculations exactly with backend leaderboard logic, resolving a visual desync between aggregate scores.
+- **Rebuilt Index Mode Desync**: Hardened index indexing logic in the storage layers to read accurate conversation tags (`mode`), correcting mismatched ADV/CNC sidebar badge allocations on legacy items.
+
 ## [0.6.0] - 2026-05-28
 
 ### Added
