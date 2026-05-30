@@ -59,8 +59,8 @@ Use MCP when your tool list includes any of these **10 tools** (server may appea
 | `council_deliberate` | `stage1`, `stage2`, `stage3`, `full` |
 | `model_chat` | `quick`, `multi_turn` |
 | `advisor_debate` | Direct params: `question`, `persona_ids` (2–4), optional `max_rounds`, models |
-| `run_iterative_debate` | Direct params: `query`, optional `debate_rounds`, `critique_mode`, `web_search`, models |
-| `council_settings` | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` |
+| `run_iterative_debate` | Direct params: `query`, optional `debate_rounds` (1–5), `critique_mode` (`freeform`/`paragraph`/`claim`), `auto_converge` (bool), `convergence_threshold` (1–3), `web_search`, `models` |
+| `council_settings` | `get`, `update` (members/chairman/temps/mode/prompts/provider toggles/**debate config**), `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` |
 | `advisor_settings` | Same preset actions + `get`, `update` |
 | `personas` | `list`, `get`, `update`, `reset` |
 | `conversations` | `list`, `get` |
@@ -454,6 +454,7 @@ curl -X PUT http://localhost:8001/api/settings \
 | `stage1_prompt` | System prompt for Stage 1 individual model responses |
 | `stage2_prompt` | System prompt for Stage 2 peer ranking |
 | `stage3_prompt` | System prompt for Stage 3 chairman synthesis |
+| `stage4_prompt` | System prompt for Stage 4 corrected draft (multi-round debate only) |
 | `title_prompt` | Prompt used to generate conversation titles |
 | `query_prompt` | Prompt used to reformulate user query for web search (LLM mode) |
 
@@ -958,6 +959,140 @@ curl -X POST http://localhost:8001/api/ask \
 
 ---
 
+### 22. Multi-Round Council Debate
+
+The Council Debate Config adds iterative refinement loops: models answer, peer-review each other, rewrite — then the Chairman synthesizes. See [`docs/COUNCIL-DEBATE-CONFIG.md`](../docs/COUNCIL-DEBATE-CONFIG.md) for the full guide.
+
+**Quick decision guide:**
+
+| Use case | `critique_mode` | `debate_rounds` |
+|----------|----------------|----------------|
+| Most questions | `freeform` | 2 |
+| Structured essays, technical comparisons | `paragraph` | 2–3 |
+| Fact-checking, claim accuracy | `claim` | 2 |
+| Research / maximum depth | `freeform` or `claim` | 3–5 |
+
+#### MCP — preferred
+
+```python
+# Simplest: 2-round freeform, auto-converge on (default)
+result = await run_iterative_debate(
+    query="What are the tradeoffs between REST and GraphQL?",
+    debate_rounds=2,
+    critique_mode="freeform",
+)
+print(result["stage4"]["response"])  # Chairman's corrected draft
+
+# Paragraph mode: structured critique per section
+result = await run_iterative_debate(
+    query="Explain the CAP theorem and its practical implications",
+    debate_rounds=3,
+    critique_mode="paragraph",
+    models=["openai:gpt-4.1", "anthropic:claude-sonnet-4-5", "google:gemini-2.5-flash"],
+)
+
+# Claim mode: per-fact verdicts (adds 1 extra API call per round)
+result = await run_iterative_debate(
+    query="Is nuclear energy a net positive for climate change?",
+    debate_rounds=2,
+    critique_mode="claim",
+    auto_converge=True,
+    convergence_threshold=1,   # stop after first stable round
+)
+
+# Force all rounds — no early stop
+result = await run_iterative_debate(
+    query="Compare PostgreSQL vs MongoDB for a social network",
+    debate_rounds=5,
+    auto_converge=False,
+)
+```
+
+#### Update debate defaults via council_settings
+
+```python
+# Set global defaults so all future debates use these values
+await council_settings(
+    action="update",
+    critique_mode="paragraph",
+    debate_rounds=2,
+    auto_converge=True,
+    convergence_threshold=2,
+)
+```
+
+#### REST fallback — run_iterative_debate equivalent
+
+There is no single REST endpoint for multi-round debate. Use the SSE stream endpoint with `debate_rounds` in the payload:
+
+```python
+import asyncio, httpx, json
+
+async def run_debate_rest(
+    query: str,
+    debate_rounds: int = 2,
+    critique_mode: str = "freeform",
+    models: list[str] | None = None,
+    base_url: str = "http://localhost:8001",
+) -> dict:
+    async with httpx.AsyncClient(timeout=600) as client:
+        # Optionally update debate settings before the run
+        await client.put(f"{base_url}/api/settings", json={
+            "critique_mode": critique_mode,
+            "debate_rounds": debate_rounds,
+        })
+
+        conv = (await client.post(f"{base_url}/api/conversations", json={})).json()
+        conv_id = conv["id"]
+
+        payload = {
+            "content": query,
+            "execution_mode": "full",
+            "debate_rounds": debate_rounds,
+        }
+        if models:
+            payload["council_models"] = models
+
+        stage4 = {}
+        all_rounds = []
+        async with client.stream(
+            "POST",
+            f"{base_url}/api/conversations/{conv_id}/message/stream",
+            json=payload,
+        ) as resp:
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                event = json.loads(line[6:])
+                t = event.get("type")
+                if t == "stage4_complete":
+                    stage4 = event.get("data", {})
+                elif t == "debate_complete":
+                    all_rounds = event.get("rounds", [])
+
+        return {"stage4": stage4, "rounds": all_rounds, "conversation_id": conv_id}
+
+# Usage
+result = asyncio.run(run_debate_rest(
+    query="What is the best approach for distributed database consistency?",
+    debate_rounds=2,
+    critique_mode="paragraph",
+    models=["openai:gpt-4.1", "anthropic:claude-sonnet-4-5", "groq:llama3-70b-8192"],
+))
+print(result["stage4"]["response"])
+```
+
+**Debate config fields (REST `PUT /api/settings` or per-request on `/message/stream`):**
+
+| Field | Type | Valid values | Default | Description |
+|-------|------|-------------|---------|-------------|
+| `critique_mode` | string | `freeform`, `paragraph`, `claim` | `freeform` | How models give feedback between rounds |
+| `debate_rounds` | integer | 1–5 | `1` | Number of Stage 1→2→3 cycles before Stage 4 |
+| `auto_converge` | boolean | — | `true` | Stop early when rankings stabilize |
+| `convergence_threshold` | integer | 1–3 | `2` | Consecutive stable rounds needed to trigger early stop |
+
+---
+
 ## Backup and Restore
 
 ```bash
@@ -1026,6 +1161,12 @@ curl -X PUT http://localhost:8001/api/settings \
 | `stage2_progress` | Each model ranks | `data`: `{model, ranking, parsed_ranking}`, `count`, `total` |
 | `stage2_complete` | After peer review | `metadata`: `{label_to_model, aggregate_rankings}` |
 | `stage3_complete` | After chairman synthesis | `data`: `{model, response, error}` |
+| `stage4_start` | Stage 4 corrected draft begins | — |
+| `stage4_complete` | Stage 4 corrected draft done | `data`: `{model, response, error}` |
+| `round_start` | Each debate round begins | `round`, `total_rounds` |
+| `round_complete` | Each debate round finishes | `round` |
+| `convergence` | Early stop triggered | `round`, `message` |
+| `debate_complete` | All debate rounds done | `total_rounds_executed`, `converged`, `critique_mode`, `rounds`, `stage4` |
 | `title_complete` | Title generated | `data`: `{title}` |
 | `error` | On failure | `message` |
 | `complete` | Stream finished | — |
