@@ -41,12 +41,14 @@ export default function RankingHeatmap({ rankings, labelToModel }) {
     });
   }
 
-  // Average rank per rankee (excluding self-votes)
+  // Average rank per rankee (matching backend leaderboard logic where self-vote defaults to a perfect 1.00)
   const avgRanks = {};
   for (const rankee of rankeeModels) {
     const vals = rankerModels
-      .filter((r) => r !== rankee)
-      .map((r) => positions[r]?.[rankee])
+      .map((r) => {
+        if (r === rankee) return 1; // Self-review defaults to a perfect 1st place in aggregate calculations
+        return positions[r]?.[rankee];
+      })
       .filter((v) => v !== undefined);
     if (vals.length > 0) {
       avgRanks[rankee] = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
@@ -59,7 +61,7 @@ export default function RankingHeatmap({ rankings, labelToModel }) {
         <h4 className="heatmap-title">📊 Peer Deliberation Matrix</h4>
         <p className="heatmap-description">
           Detailed matrix of anonymous peer reviews. Raters are on the left; rated responses are on top.
-          Self-review cells are disabled (—).
+          Self-review cells (—) are excluded from the grid but counted as a perfect <strong>1st place (1.00)</strong> in aggregate score calculations to match the leaderboard averages.
         </p>
       </div>
 
