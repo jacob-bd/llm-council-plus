@@ -24,6 +24,14 @@ const COUNCIL_PROMPTS = [
     variables: ['user_query', 'stage1_responses', 'rankings_text', 'search_context_block'],
   },
   {
+    id: 'stage4',
+    key: 'stage4_prompt',
+    label: 'Stage 4',
+    heading: 'Stage 4: Corrected Draft (Multi-Round)',
+    description: 'Used when the chairman synthesizes claims and edits the previous responses into a finalized, revised draft after multiple debate rounds.',
+    variables: ['total_rounds', 'original_text', 'verdict_text'],
+  },
+  {
     id: 'title',
     key: 'title_prompt',
     label: 'Title',

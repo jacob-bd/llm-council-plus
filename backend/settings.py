@@ -94,7 +94,8 @@ from .prompts import (
     STAGE2_PROMPT_DEFAULT,
     STAGE3_PROMPT_DEFAULT,
     TITLE_PROMPT_DEFAULT,
-    QUERY_PROMPT_DEFAULT
+    QUERY_PROMPT_DEFAULT,
+    STAGE4_CORRECTED_DRAFT_PROMPT
 )
 from .advisor_prompts import (
     ADVISOR_ROUND1_PROMPT,
@@ -160,6 +161,7 @@ class Settings(BaseModel):
     stage1_prompt: str = STAGE1_PROMPT_DEFAULT
     stage2_prompt: str = STAGE2_PROMPT_DEFAULT
     stage3_prompt: str = STAGE3_PROMPT_DEFAULT
+    stage4_prompt: str = STAGE4_CORRECTED_DRAFT_PROMPT
     title_prompt: str = TITLE_PROMPT_DEFAULT
     query_prompt: str = QUERY_PROMPT_DEFAULT
     
@@ -190,6 +192,7 @@ PROMPT_DEFAULTS = {
     "stage1_prompt": STAGE1_PROMPT_DEFAULT,
     "stage2_prompt": STAGE2_PROMPT_DEFAULT,
     "stage3_prompt": STAGE3_PROMPT_DEFAULT,
+    "stage4_prompt": STAGE4_CORRECTED_DRAFT_PROMPT,
     "title_prompt": TITLE_PROMPT_DEFAULT,
     "query_prompt": QUERY_PROMPT_DEFAULT,
     "advisor_round1_prompt": ADVISOR_ROUND1_PROMPT,

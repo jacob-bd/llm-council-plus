@@ -1062,6 +1062,7 @@ class UpdateSettingsRequest(BaseModel):
     stage1_prompt: Optional[str] = None
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
+    stage4_prompt: Optional[str] = None
     title_prompt: Optional[str] = None
     query_prompt: Optional[str] = None
 
@@ -1137,6 +1138,7 @@ async def get_app_settings():
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+        "stage4_prompt": settings.stage4_prompt,
         "title_prompt": settings.title_prompt,
         "query_prompt": settings.query_prompt,
 
@@ -1255,6 +1257,8 @@ async def update_app_settings(request: UpdateSettingsRequest):
         updates["stage2_prompt"] = request.stage2_prompt
     if request.stage3_prompt is not None:
         updates["stage3_prompt"] = request.stage3_prompt
+    if request.stage4_prompt is not None:
+        updates["stage4_prompt"] = request.stage4_prompt
     if request.title_prompt is not None:
         updates["title_prompt"] = request.title_prompt
     if request.query_prompt is not None:
@@ -1432,6 +1436,7 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+        "stage4_prompt": settings.stage4_prompt,
         "title_prompt": settings.title_prompt,
         "query_prompt": settings.query_prompt,
 

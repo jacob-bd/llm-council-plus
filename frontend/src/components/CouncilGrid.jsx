@@ -98,7 +98,13 @@ export default function CouncilGrid({
                                 <span className="avatar-icon">{info.icon}</span>
                             )}
                             {cardState === 'active' && <div className="thinking-ring"></div>}
-                            {cardState === 'done' && <div className="done-badge">✓</div>}
+                            {cardState === 'done' ? (
+                                <div className="done-badge">✓</div>
+                            ) : (
+                                status === 'thinking' && !isPlaceholder && cardState !== 'active' && (
+                                    <div className="working-badge" title="Still working...">⏳</div>
+                                )
+                            )}
                         </div>
                         <div className="council-info">
                             <span className="model-name">

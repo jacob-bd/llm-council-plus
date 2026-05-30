@@ -228,10 +228,34 @@ export default function ChatInterface({
 
                         return (
                         <div key={`${conversation.id}-msg-${index}`} className={`message ${msg.role}`}>
-                            <div className="message-role">
-                                {msg.role === 'user'
-                                    ? (mode === 'advisors' ? 'Your Question' : 'Your Question to the Council')
-                                    : (mode === 'advisors' ? 'Advisor Panel' : 'LLM Council')}
+                            <div className="message-role" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span>
+                                    {msg.role === 'user'
+                                        ? (mode === 'advisors' ? 'Your Question' : 'Your Question to the Council')
+                                        : (mode === 'advisors' ? 'Advisor Panel' : 'LLM Council')}
+                                </span>
+                                {msg.role === 'assistant' && msg.type !== 'advisor_debate' && (() => {
+                                    const knownMode = msg.metadata?.execution_mode
+                                        || (index === conversation.messages.length - 1 ? executionMode : null);
+                                    if (!knownMode) return null;
+
+                                    const rounds = msg.metadata?.rounds?.length || msg.metadata?.debate_rounds_configured || 1;
+                                    const critique = msg.metadata?.critique_mode || 'freeform';
+                                    let label;
+                                    if (knownMode === 'chat_only') label = '💬 Chat Only';
+                                    else if (knownMode === 'chat_ranking') label = '⚖️ Chat + Ranking';
+                                    else if (knownMode === 'full') {
+                                        if (rounds > 1) {
+                                            const capitalizedCritique = critique.charAt(0).toUpperCase() + critique.slice(1);
+                                            label = `🏛️ Full Debate (${rounds} Rds • ${capitalizedCritique})`;
+                                        } else {
+                                            label = '🏛️ Full Deliberation';
+                                        }
+                                    } else {
+                                        label = '🏛️ Deliberation';
+                                    }
+                                    return <span className="debate-mode-pill">{label}</span>;
+                                })()}
                             </div>
 
                             <div className="message-content">

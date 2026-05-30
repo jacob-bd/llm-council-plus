@@ -754,7 +754,7 @@ async def run_iterative_debate(
     # --- Stage 4: Corrected Draft (after all rounds, if full mode) ---
     stage4_result: Optional[Dict[str, Any]] = None
 
-    if execution_mode == "full" and previous_synthesis and num_rounds >= 1:
+    if execution_mode == "full" and previous_synthesis and num_rounds > 1:
         if request and await request.is_disconnected():
             raise asyncio.CancelledError("Client disconnected")
 
@@ -763,11 +763,19 @@ async def run_iterative_debate(
 
         from .prompts import STAGE4_CORRECTED_DRAFT_PROMPT
 
-        stage4_prompt = STAGE4_CORRECTED_DRAFT_PROMPT.format(
-            total_rounds=len(all_rounds_data),
-            original_text=truncate_text(user_query, 12000),
-            verdict_text=truncate_text(previous_synthesis, 10000),
-        )
+        stage4_template = settings.stage4_prompt.strip() or STAGE4_CORRECTED_DRAFT_PROMPT
+        try:
+            stage4_prompt = stage4_template.format(
+                total_rounds=len(all_rounds_data),
+                original_text=truncate_text(user_query, 12000),
+                verdict_text=truncate_text(previous_synthesis, 10000),
+            )
+        except (KeyError, IndexError, ValueError):
+            stage4_prompt = STAGE4_CORRECTED_DRAFT_PROMPT.format(
+                total_rounds=len(all_rounds_data),
+                original_text=truncate_text(user_query, 12000),
+                verdict_text=truncate_text(previous_synthesis, 10000),
+            )
 
         stage4_result = await stage3_synthesize_final(
             user_query, [], [], "",

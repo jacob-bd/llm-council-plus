@@ -11,79 +11,287 @@ export default function DebateSettings({
     setConvergenceThreshold,
     executionMode,
 }) {
-    return (
-        <section>
-            <h3>Debate Config</h3>
-            <p className="section-description">
-                Configure the multi-round iterative debate pipeline, convergence parameters, and critique formatting.
-            </p>
+    // Deliberation and Cost Meter helpers
+    const getMeterInfo = (rounds) => {
+        if (rounds === 1) {
+            return {
+                width: '20%',
+                color: '#06b6d4', // Turquoise accent
+                label: 'Single Pass / Instant Response',
+                desc: 'Standard one-pass response. Fastest execution, zero debate overhead, and minimal token cost.'
+            };
+        } else if (rounds <= 3) {
+            return {
+                width: rounds === 2 ? '40%' : '60%',
+                color: '#06b6d4', // Turquoise accent
+                label: `Balanced Deliberation (${rounds} Rounds)`,
+                desc: 'Highly Recommended. Models engage in peer review & critique, driving optimal analytical depth without excessive token costs.'
+            };
+        } else {
+            return {
+                width: rounds === 4 ? '80%' : '100%',
+                color: '#f59e0b', // Amber alert color
+                label: `Deep Reasoning (${rounds} Rounds)`,
+                desc: 'Maximum convergence depth. Warning: Consumes significantly higher API tokens and introduces noticeable latency per model.'
+            };
+        }
+    };
 
-            <div className="settings-group">
-                <div className="setting-row">
-                    <label>Critique Mode</label>
-                    <div className="radio-group" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                            <input type="radio" name="critiqueMode" value="freeform"
-                                checked={critiqueMode === 'freeform'}
-                                onChange={(e) => setCritiqueMode(e.target.value)} />
-                            Free-form
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                            <input type="radio" name="critiqueMode" value="paragraph"
-                                checked={critiqueMode === 'paragraph'}
-                                onChange={(e) => setCritiqueMode(e.target.value)} />
-                            Paragraph-level
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                            <input type="radio" name="critiqueMode" value="claim"
-                                checked={critiqueMode === 'claim'}
-                                onChange={(e) => setCritiqueMode(e.target.value)} />
-                            Claim-level
-                        </label>
+    const meter = getMeterInfo(debateRounds);
+
+    return (
+        <section className="debate-settings-section">
+            <div className="debate-section-header">
+                <div className="debate-title-wrapper">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="debate-title-icon">
+                        <path d="M17 6.1H3" />
+                        <path d="M21 12H3" />
+                        <path d="M17 17.9H3" />
+                    </svg>
+                    <h3>Council Debate Config</h3>
+                </div>
+                <p className="section-description">
+                    Configure the multi-round iterative debate pipeline, convergence parameters, and critique formatting for the Council deliberation. <em>Note: These settings apply strictly to the main multi-model Council and do not affect the Advisor debate setups.</em>
+                </p>
+            </div>
+
+            <div className="settings-group debate-settings-group">
+                <div className="debate-group-title">
+                    <h4>Critique Mode</h4>
+                    <span className="debate-helper-badge">Deliberation Protocol</span>
+                </div>
+
+                <div className="debate-card-stack">
+                    {/* Freeform Card */}
+                    <div 
+                        className={`debate-mode-list-card ${critiqueMode === 'freeform' ? 'active' : ''}`}
+                        onClick={() => setCritiqueMode('freeform')}
+                    >
+                        <div className="debate-card-header">
+                            <div className="debate-card-title-block">
+                                <span className="debate-card-icon-wrapper freeform-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </span>
+                                <div className="debate-card-title-text">
+                                    <h5>Free-form</h5>
+                                    <p className="debate-card-concept">Conversational refinement</p>
+                                </div>
+                            </div>
+                            <span className="debate-badge fastest">Fastest (1x cost)</span>
+                        </div>
+                        
+                        <div className="debate-card-details">
+                            <ul className="debate-details-list">
+                                <li>
+                                    <span className="bullet-label">How it works:</span> Models simply read each other's full drafts from the previous round and provide critiques in standard conversational English.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Pros & Cons:</span> Fast execution time, lowest token consumption (no extra overhead calls), and highly flexible.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Best for:</span> Creative writing, open-ended brainstorming, rapid queries, or when speed and cost are prioritized.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Paragraph-level Card */}
+                    <div 
+                        className={`debate-mode-list-card ${critiqueMode === 'paragraph' ? 'active' : ''}`}
+                        onClick={() => setCritiqueMode('paragraph')}
+                    >
+                        <div className="debate-card-header">
+                            <div className="debate-card-title-block">
+                                <span className="debate-card-icon-wrapper paragraph-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="21" y1="6" x2="9" y2="6" />
+                                        <line x1="21" y1="12" x2="9" y2="12" />
+                                        <line x1="21" y1="18" x2="9" y2="18" />
+                                        <rect x="3" y="5" width="2" height="2" />
+                                        <rect x="3" y="11" width="2" height="2" />
+                                        <rect x="3" y="17" width="2" height="2" />
+                                    </svg>
+                                </span>
+                                <div className="debate-card-title-text">
+                                    <h5>Paragraph-level</h5>
+                                    <p className="debate-card-concept">Structured citation review</p>
+                                </div>
+                            </div>
+                            <span className="debate-badge balanced">Balanced (1.1x cost)</span>
+                        </div>
+                        
+                        <div className="debate-card-details">
+                            <ul className="debate-details-list">
+                                <li>
+                                    <span className="bullet-label">How it works:</span> Before peer reviews start, the backend automatically parses and pre-numbers each response by paragraph (e.g. <code>[Paragraph 1]</code>). Evaluators must cite these specific numbers during their critiques.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Pros & Cons:</span> Stabilizes model cross-referencing, prevents hallucinated reference locations, and provides organized section-by-section critiques.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Best for:</span> Structured essays, multi-part answers, or complex policy/legal analysis where specific sections need rigorous comparison.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Claim-level Card */}
+                    <div 
+                        className={`debate-mode-list-card ${critiqueMode === 'claim' ? 'active' : ''}`}
+                        onClick={() => setCritiqueMode('claim')}
+                    >
+                        <div className="debate-card-header">
+                            <div className="debate-card-title-block">
+                                <span className="debate-card-icon-wrapper claim-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        <path d="m9 11 2 2 4-4" />
+                                    </svg>
+                                </span>
+                                <div className="debate-card-title-text">
+                                    <h5>Claim-level</h5>
+                                    <p className="debate-card-concept">Factual assertion mapping</p>
+                                </div>
+                            </div>
+                            <span className="debate-badge rigorous">Rigorous (1.5x cost)</span>
+                        </div>
+                        
+                        <div className="debate-card-details">
+                            <ul className="debate-details-list">
+                                <li>
+                                    <span className="bullet-label">How it works:</span> A background agent extracts core factual assertions ("canonical claims") into structured JSON. Evaluators then map individual truth verdicts directly over these claims. The UI renders an interactive, color-coded visual claim map.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Pros & Cons:</span> Maximum factual rigor, isolates exact points of contention, and prevents hand-waving arguments. Adds 1 extra claim-extraction API call per model per round.
+                                </li>
+                                <li>
+                                    <span className="bullet-label">Best for:</span> Technical auditing, code verification, fact-checking, mathematical proofs, or logical reasoning.
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
-                {critiqueMode !== 'freeform' && (
-                    <p className="setting-hint">
-                        {critiqueMode === 'claim'
-                            ? 'Claim-level extracts canonical claims and maps evaluator verdicts directly over them. This adds ~1 extra API call per round for extraction.'
-                            : 'Paragraph-level pre-numbers response paragraphs for stable, structured evaluation.'}
-                    </p>
-                )}
-                <div className="setting-row" style={{ marginTop: '20px' }}>
-                    <label>Number of Rounds</label>
-                    <select value={debateRounds} onChange={(e) => setDebateRounds(Number(e.target.value))}>
+
+                {/* Number of Rounds */}
+                <div className="debate-rounds-section" style={{ marginTop: '32px' }}>
+                    <div className="debate-group-title">
+                        <h4>Number of Rounds</h4>
+                        <span className="debate-helper-badge">Deliberation Depth</span>
+                    </div>
+
+                    <div className="rounds-segmented-bar">
                         {[1, 2, 3, 4, 5].map((n) => (
-                            <option key={n} value={n}>{n}{n === 1 ? ' (single pass)' : ` rounds`}</option>
+                            <button
+                                key={n}
+                                type="button"
+                                className={`rounds-step-btn ${debateRounds === n ? 'active' : ''}`}
+                                onClick={() => setDebateRounds(n)}
+                            >
+                                <span className="rounds-step-number">{n}</span>
+                                <span className="rounds-step-label">
+                                    {n === 1 ? 'Single Pass' : `${n} Rounds`}
+                                </span>
+                            </button>
                         ))}
-                    </select>
-                </div>
-                {debateRounds > 1 && (
-                    <>
-                        <div className="setting-row" style={{ marginTop: '20px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                                <input type="checkbox" checked={autoConverge} onChange={(e) => setAutoConverge(e.target.checked)} />
-                                Auto-converge (stop early if rankings stabilize)
-                            </label>
+                    </div>
+
+                    {/* Deliberation & Cost Meter */}
+                    <div className="cost-meter-container">
+                        <div className="cost-meter-header">
+                            <span className="cost-meter-title">{meter.label}</span>
+                            <span className="cost-meter-percentage">{debateRounds === 1 ? 'Low Cost' : debateRounds <= 3 ? 'Balanced' : 'High Token Cost'}</span>
                         </div>
-                        {autoConverge && (
-                            <div className="setting-row" style={{ marginTop: '16px' }}>
-                                <label>Convergence threshold</label>
-                                <select value={convergenceThreshold} onChange={(e) => setConvergenceThreshold(Number(e.target.value))}>
-                                    {[1, 2, 3].map((n) => (
-                                        <option key={n} value={n}>{n} stable round{n > 1 ? 's' : ''}</option>
-                                    ))}
-                                </select>
+                        <div className="cost-meter-track">
+                            <div 
+                                className="cost-meter-fill animate-width" 
+                                style={{ 
+                                    width: meter.width, 
+                                    backgroundColor: meter.color,
+                                    boxShadow: `0 0 10px ${meter.color}40`
+                                }}
+                            />
+                        </div>
+                        <p className="cost-meter-description">{meter.desc}</p>
+                    </div>
+                </div>
+
+                {/* Warnings / Multi-round Drawer */}
+                {debateRounds > 1 ? (
+                    <div className="convergence-drawer-container">
+                        <div className="convergence-card">
+                            <div
+                                className="convergence-toggle-row"
+                                onClick={() => setAutoConverge(!autoConverge)}
+                            >
+                                <div className="convergence-toggle-left">
+                                    <div className="premium-checkbox-wrapper">
+                                        <input
+                                            type="checkbox"
+                                            id="autoConvergeToggle"
+                                            className="premium-checkbox"
+                                            checked={autoConverge}
+                                            onChange={(e) => setAutoConverge(e.target.checked)}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <label
+                                            htmlFor="autoConvergeToggle"
+                                            className="premium-checkbox-label"
+                                            onClick={(e) => e.stopPropagation()}
+                                        ></label>
+                                    </div>
+                                    <div className="convergence-toggle-text">
+                                        <h5>Auto-converge</h5>
+                                        <p className="convergence-toggle-hint">Stop early if peer rankings stabilize</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {autoConverge && (
+                                <div className="convergence-threshold-section animate-slide-down">
+                                    <span className="convergence-threshold-label">Required Stable Rounds</span>
+                                    <div className="threshold-segmented-bar">
+                                        {[1, 2, 3].map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                className={`threshold-btn ${convergenceThreshold === n ? 'active' : ''}`}
+                                                onClick={() => setConvergenceThreshold(n)}
+                                            >
+                                                {n} Stable Round{n > 1 ? 's' : ''}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="setting-hint threshold-hint">
+                                        Early stopping triggers if the relative rankings of all response drafts remain identical for {convergenceThreshold} consecutive rounds. Saves significant API tokens!
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {executionMode === 'chat_only' && (
+                            <div className="debate-warning-banner">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="warning-banner-icon">
+                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                    <line x1="12" y1="9" x2="12" y2="13" />
+                                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg>
+                                <span>Multi-round debate is configured but currently not active. Change Execution Mode to <strong>Chat + Ranking</strong> or <strong>Full Deliberation</strong> in the main screen to enable it.</span>
                             </div>
                         )}
-                        {executionMode === 'chat_only' && (
-                            <p className="setting-hint" style={{ color: '#f59e0b', marginTop: '12px' }}>
-                                ⚠️ Multi-round debate is not available in Chat Only mode.
-                            </p>
-                        )}
-                        <p className="setting-hint" style={{ marginTop: '12px' }}>
-                            More rounds = deeper analysis, but higher API consumption.
-                        </p>
-                    </>
+                    </div>
+                ) : (
+                    executionMode !== 'chat_only' ? null : (
+                        <div className="debate-warning-banner" style={{ marginTop: '20px' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="warning-banner-icon">
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                            <span>Execution Mode is currently <strong>Chat Only</strong>. Deliberative peer review stages and synthetic convergence are bypassed.</span>
+                        </div>
+                    )
                 )}
             </div>
         </section>

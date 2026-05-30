@@ -889,3 +889,22 @@
     filter: drop-shadow(0 0 4px rgba(6, 182, 212, 0.8));
   }
 }
+
+/* Debate Mode visual pill in chat headers */
+.debate-mode-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #06b6d4; /* Turquoise accent */
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.05);
+  animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
