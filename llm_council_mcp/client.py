@@ -204,6 +204,42 @@ class CouncilClient:
                     except json.JSONDecodeError:
                         continue
 
+    async def stream_debate_message(
+        self,
+        conversation_id: str,
+        content: str,
+        web_search: bool = False,
+        execution_mode: str = "full",
+        council_models: list[str] | None = None,
+        chairman_model: str | None = None,
+        debate_rounds: int | None = None,
+    ) -> AsyncIterator[dict]:
+        """Stream SSE events from the multi-round iterative debate endpoint.
+
+        Yields parsed event dicts.
+        """
+        url = f"{self.base_url}/api/conversations/{conversation_id}/message/debate"
+        payload: dict[str, Any] = {
+            "content": content,
+            "web_search": web_search,
+            "execution_mode": execution_mode,
+        }
+        if council_models:
+            payload["council_models"] = council_models
+        if chairman_model:
+            payload["chairman_model"] = chairman_model
+        if debate_rounds is not None:
+            payload["debate_rounds"] = debate_rounds
+        async with self.client.stream("POST", url, json=payload) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if line.startswith("data: "):
+                    raw = line[len("data: "):]
+                    try:
+                        yield json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+
     # ── Personas ──────────────────────────────────────────────────────────────
 
     async def get_personas(self) -> list[dict]:

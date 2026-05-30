@@ -166,6 +166,12 @@ class Settings(BaseModel):
     # Execution Mode
     execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'
 
+    # Iterative Debate
+    critique_mode: str = "freeform"        # "freeform", "paragraph", "claim"
+    debate_rounds: int = 1                 # Number of rounds (1 = current behavior)
+    auto_converge: bool = True             # Stop early if rankings stabilize
+    convergence_threshold: int = 2         # Consecutive stable rounds to trigger
+
     # Advisor Settings
     advisor_default_model: str = ""
     advisor_tiebreaker_model: str = ""

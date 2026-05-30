@@ -83,7 +83,15 @@ async def query_models_parallel(models: List[str], messages: List[Dict[str, str]
     return dict(results)
 
 
-async def stage1_collect_responses(user_query: str, search_context: str = "", request: Any = None, models_override: "List[str] | None" = None, history: "List[Dict[str, str]] | None" = None) -> Any:
+async def stage1_collect_responses(
+    user_query: str,
+    search_context: str = "",
+    request: Any = None,
+    models_override: "List[str] | None" = None,
+    history: "List[Dict[str, str]] | None" = None,
+    messages_override: "List[Dict[str, str]] | None" = None,
+    per_model_messages: "Dict[str, List[Dict[str, str]]] | None" = None
+) -> Any:
     """
     Stage 1: Collect individual responses from all council models.
 
@@ -93,6 +101,8 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
         request: FastAPI request object for checking disconnects
         models_override: Per-request model list (bypasses global config)
         history: Prior conversation turns as [{role, content}, ...] for multi-turn
+        messages_override: Optional messages override to bypass default prompt
+        per_model_messages: Optional messages per model
 
     Yields:
         - First yield: total_models (int)
@@ -121,7 +131,10 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
         logger.warning(f"Error formatting Stage 1 prompt: {e}. Using fallback.")
         prompt = f"{search_context_block}Question: {user_query}" if search_context_block else user_query
 
-    messages = (history or []) + [{"role": "user", "content": prompt}]
+    if messages_override is not None:
+        messages = messages_override
+    else:
+        messages = (history or []) + [{"role": "user", "content": prompt}]
 
     models = models_override if models_override is not None and len(models_override) > 0 else get_council_models()
     
@@ -132,7 +145,8 @@ async def stage1_collect_responses(user_query: str, search_context: str = "", re
 
     async def _query_safe(m: str):
         try:
-            return m, await query_model(m, messages, temperature=council_temp)
+            model_msgs = per_model_messages.get(m, messages) if per_model_messages else messages
+            return m, await query_model(m, model_msgs, temperature=council_temp)
         except Exception as e:
             return m, {"error": True, "error_message": str(e)}
 
@@ -198,7 +212,8 @@ async def stage2_collect_rankings(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     search_context: str = "",
-    request: Any = None
+    request: Any = None,
+    prompt_override: "str | None" = None,
 ) -> Any: # Returns an async generator
     """
     Stage 2: Collect peer rankings from all council models.
@@ -230,35 +245,38 @@ async def stage2_collect_rankings(
         for label, result in zip(labels, successful_results)
     ])
 
-    search_context_block = ""
-    if search_context:
-        search_context_block = f"Context from Web Search:\n{search_context}\n"
+    if prompt_override:
+        ranking_prompt = prompt_override
+    else:
+        search_context_block = ""
+        if search_context:
+            search_context_block = f"Context from Web Search:\n{search_context}\n"
 
-    try:
-        # Ensure prompt is not None
-        prompt_template = settings.stage2_prompt
-        if not prompt_template:
-            from .prompts import STAGE2_PROMPT_DEFAULT
-            prompt_template = STAGE2_PROMPT_DEFAULT
+        try:
+            # Ensure prompt is not None
+            prompt_template = settings.stage2_prompt
+            if not prompt_template:
+                from .prompts import STAGE2_PROMPT_DEFAULT
+                prompt_template = STAGE2_PROMPT_DEFAULT
 
-        ranking_prompt = prompt_template.format(
-            user_query=user_query,
-            responses_text=responses_text,
-            search_context_block=search_context_block
-        )
-        valid_label_list = ", ".join(label_to_model.keys())
-        ranking_prompt += (
-            f"\n\nCRITICAL: Your FINAL RANKING must include ONLY these labels, "
-            f"each exactly once: {valid_label_list}. "
-            f"Do not invent or reference any other response labels."
-        )
-    except (KeyError, AttributeError, TypeError) as e:
-        logger.warning(f"Error formatting Stage 2 prompt: {e}. Using fallback.")
-        valid_label_list = ", ".join(label_to_model.keys())
-        ranking_prompt = (
-            f"Question: {user_query}\n\n{responses_text}\n\n"
-            f"Rank these responses. FINAL RANKING must include ONLY: {valid_label_list}."
-        )
+            ranking_prompt = prompt_template.format(
+                user_query=user_query,
+                responses_text=responses_text,
+                search_context_block=search_context_block
+            )
+            valid_label_list = ", ".join(label_to_model.keys())
+            ranking_prompt += (
+                f"\n\nCRITICAL: Your FINAL RANKING must include ONLY these labels, "
+                f"each exactly once: {valid_label_list}. "
+                f"Do not invent or reference any other response labels."
+            )
+        except (KeyError, AttributeError, TypeError) as e:
+            logger.warning(f"Error formatting Stage 2 prompt: {e}. Using fallback.")
+            valid_label_list = ", ".join(label_to_model.keys())
+            ranking_prompt = (
+                f"Question: {user_query}\n\n{responses_text}\n\n"
+                f"Rank these responses. FINAL RANKING must include ONLY: {valid_label_list}."
+            )
 
     messages = [{"role": "user", "content": ranking_prompt}]
 
@@ -345,12 +363,31 @@ async def stage2_collect_rankings(
         raise
 
 
+def build_stage_texts(
+    stage1_results: List[Dict[str, Any]],
+    stage2_results: List[Dict[str, Any]],
+) -> tuple:
+    """Build formatted text summaries from stage results. Returns (stage1_text, stage2_text)."""
+    stage1_text = "\n\n".join([
+        f"Model: {result['model']}\nResponse: {result.get('response', 'No response')}"
+        for result in stage1_results
+        if result.get('response') is not None
+    ])
+    stage2_text = "\n\n".join([
+        f"Model: {result['model']}\nRanking: {result.get('ranking', 'No ranking')}"
+        for result in stage2_results
+        if result.get('ranking') is not None
+    ])
+    return stage1_text, stage2_text
+
+
 async def stage3_synthesize_final(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     stage2_results: List[Dict[str, Any]],
     search_context: str = "",
-    chairman_override: "str | None" = None
+    chairman_override: "str | None" = None,
+    prompt_override: "str | None" = None
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -361,6 +398,7 @@ async def stage3_synthesize_final(
         stage2_results: Rankings from Stage 2
         search_context: Optional web search results
         chairman_override: Per-request chairman model (bypasses global config)
+        prompt_override: Optional prompt override
 
     Returns:
         Dict with 'model' and 'response' keys
@@ -368,38 +406,31 @@ async def stage3_synthesize_final(
     settings = get_settings()
 
     # Build comprehensive context for chairman (only include successful responses)
-    stage1_text = "\n\n".join([
-        f"Model: {result['model']}\nResponse: {result.get('response', 'No response')}"
-        for result in stage1_results
-        if result.get('response') is not None
-    ])
+    stage1_text, stage2_text = build_stage_texts(stage1_results, stage2_results)
 
-    stage2_text = "\n\n".join([
-        f"Model: {result['model']}\nRanking: {result.get('ranking', 'No ranking')}"
-        for result in stage2_results
-        if result.get('ranking') is not None
-    ])
+    if prompt_override:
+        chairman_prompt = prompt_override
+    else:
+        search_context_block = ""
+        if search_context:
+            search_context_block = f"Context from Web Search:\n{search_context}\n"
 
-    search_context_block = ""
-    if search_context:
-        search_context_block = f"Context from Web Search:\n{search_context}\n"
+        try:
+            # Ensure prompt is not None
+            prompt_template = settings.stage3_prompt
+            if not prompt_template:
+                from .prompts import STAGE3_PROMPT_DEFAULT
+                prompt_template = STAGE3_PROMPT_DEFAULT
 
-    try:
-        # Ensure prompt is not None
-        prompt_template = settings.stage3_prompt
-        if not prompt_template:
-            from .prompts import STAGE3_PROMPT_DEFAULT
-            prompt_template = STAGE3_PROMPT_DEFAULT
-
-        chairman_prompt = prompt_template.format(
-            user_query=user_query,
-            stage1_text=stage1_text,
-            stage2_text=stage2_text,
-            search_context_block=search_context_block
-        )
-    except (KeyError, AttributeError, TypeError) as e:
-        logger.warning(f"Error formatting Stage 3 prompt: {e}. Using fallback.")
-        chairman_prompt = f"Question: {user_query}\n\nSynthesis required."
+            chairman_prompt = prompt_template.format(
+                user_query=user_query,
+                stage1_text=stage1_text,
+                stage2_text=stage2_text,
+                search_context_block=search_context_block
+            )
+        except (KeyError, AttributeError, TypeError) as e:
+            logger.warning(f"Error formatting Stage 3 prompt: {e}. Using fallback.")
+            chairman_prompt = f"Question: {user_query}\n\nSynthesis required."
 
     # Determine message structure based on whether the prompt is default or custom
     from .prompts import STAGE3_PROMPT_DEFAULT

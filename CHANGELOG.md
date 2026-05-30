@@ -5,10 +5,15 @@ All notable changes to LLM Council Plus will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.0] - 2026-05-30
 
-### Planned
-- _(none)_
+### Added
+- **Multi-Round Iterative Debate Phase 2** (Contributed by @manavgup): Added a sophisticated multi-round debate orchestration system allowing models to debate, refine answers, and cross-pollinate their views over multiple rounds.
+- **Three Custom Critique Modes**: Added "Free-form", "Paragraph-level", and "Claim-level" debate critique formats.
+- **Canonical Claim Extraction & Verification**: Automatically extracts canonical claims using a structured JSON extractor and maps model verdicts directly over them in Stage 2.
+- **Stateful Interactive Round Selector**: Built a highly interactive `.round-navigator` in the frontend allowing users to click and navigate individual debate rounds retroactively.
+- **Stage 4: Corrected Draft**: Added a post-debate rewriting stage where the chairman synthesizes the final corrected draft, highlighting `[REVISED]` or `[NEW]` components.
+- **Debate MCP Tools Integration**: Added new `run_iterative_debate` tool and updated `council_settings` to support critique modes and debate rounds configuration.
 
 ## [0.6.1] - 2026-05-30
 

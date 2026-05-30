@@ -348,3 +348,50 @@ async def buffer_stage3(events: AsyncIterator[dict], conversation_id: str) -> di
             "retryable": True,
         },
     }
+
+
+async def buffer_iterative_debate(events: AsyncIterator[dict], conversation_id: str) -> dict:
+    """Consume events until debate_complete or error, returning the full multi-round debate results."""
+    all_events = await _drain_to_list(events)
+
+    rounds = []
+    stage4 = None
+    converged = False
+    critique_mode = "freeform"
+    error_msg = None
+
+    for event in all_events:
+        etype = event.get("type")
+        if etype == "debate_complete":
+            rounds = event.get("rounds", rounds)
+            stage4 = event.get("stage4", stage4)
+            converged = event.get("converged", converged)
+            critique_mode = event.get("critique_mode", critique_mode)
+            break
+        elif etype == "convergence":
+            converged = True
+        elif etype == "stage4_complete":
+            stage4 = event.get("data")
+        elif etype == "error":
+            error_msg = event.get("message", "Unknown error")
+            break
+
+    if error_msg:
+        return {
+            "conversation_id": conversation_id,
+            "status": "error",
+            "error": {
+                "type": "provider_error",
+                "message": error_msg,
+                "retryable": False,
+            }
+        }
+
+    return {
+        "conversation_id": conversation_id,
+        "status": "success",
+        "critique_mode": critique_mode,
+        "converged": converged,
+        "rounds": rounds,
+        "stage4": stage4,
+    }

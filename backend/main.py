@@ -21,6 +21,7 @@ from .search import perform_web_search, SearchProvider
 from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS, PROMPT_DEFAULTS
 from .personas import get_all_personas, save_persona_override, delete_persona_override, get_persona
 from .advisors import run_debate
+from .debate import run_iterative_debate, MAX_DEBATE_ROUNDS
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,7 @@ class SendMessageRequest(BaseModel):
     execution_mode: ExecutionMode = "full"
     council_models: Optional[List[str]] = None
     chairman_model: Optional[str] = None
+    debate_rounds: Optional[int] = None
 
 
 class AskRequest(BaseModel):
@@ -327,7 +329,7 @@ async def health_check(request: Request):
         "service": "LLM Council API",
         "mcp": {
             "sse_url": f"{scheme}://{host}/mcp/sse",
-            "tools": 9,
+            "tools": 10,
         },
     }
 
@@ -564,6 +566,178 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             # Save error to conversation history
             storage.add_error_message(conversation_id, f"Error: {str(e)}")
             # Send error event
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+@app.post("/api/conversations/{conversation_id}/message/debate")
+async def send_debate_message_stream(conversation_id: str, body: SendMessageRequest, request: Request):
+    """Send a message and stream the multi-round iterative debate process."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    history = _build_chat_history(conversation)
+    is_first_message = len(conversation["messages"]) == 0
+
+    async def event_generator():
+        try:
+            # Initialize variables
+            rounds_data = []
+            final_stage1 = []
+            final_stage2 = []
+            final_stage3 = None
+            final_label_to_model = {}
+            final_aggregate_rankings = []
+            final_canonical_claims = None
+            final_aggregate_claim_verdicts = None
+            final_stage4 = None
+            debate_critique_mode = "freeform"
+            debate_converged = False
+            
+            storage.add_user_message(conversation_id, body.content, conversation=conversation)
+
+            preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+            if preflight_error:
+                storage.add_error_message(conversation_id, preflight_error)
+                yield f"data: {json.dumps({'type': 'error', 'message': preflight_error})}\n\n"
+                return
+
+            # Start title generation in parallel
+            title_task = None
+            if is_first_message:
+                title_task = asyncio.create_task(generate_conversation_title(body.content))
+
+            search_context = ""
+            search_query = ""
+            if body.search_provider or body.web_search:
+                if await request.is_disconnected():
+                    raise asyncio.CancelledError("Client disconnected")
+
+                settings = get_settings()
+                provider = _apply_search_env(settings, body.search_provider)
+
+                yield f"data: {json.dumps({'type': 'search_start', 'data': {'provider': provider.value}})}\n\n"
+
+                if await request.is_disconnected():
+                    raise asyncio.CancelledError("Client disconnected")
+
+                if settings.search_keyword_extraction == "llm" and provider != SearchProvider.DUCKDUCKGO:
+                    search_query = await generate_search_query(body.content)
+                else:
+                    search_query = body.content
+
+                if await request.is_disconnected():
+                    raise asyncio.CancelledError("Client disconnected")
+
+                search_result = await perform_web_search(
+                    search_query,
+                    settings.search_result_count,
+                    provider,
+                    settings.full_content_results,
+                    settings.search_keyword_extraction,
+                    hybrid_mode=settings.search_hybrid_mode
+                )
+                search_context = search_result["results"]
+                extracted_query = search_result["extracted_query"]
+                search_intent = search_result.get("intent", "unknown")
+                yield f"data: {json.dumps({'type': 'search_complete', 'data': {'search_query': search_query, 'extracted_query': extracted_query, 'search_context': search_context, 'provider': provider.value, 'intent': search_intent}})}\n\n"
+                await asyncio.sleep(0.05)
+
+            settings = get_settings()
+            effective_rounds = body.debate_rounds if body.debate_rounds is not None else settings.debate_rounds
+            effective_rounds = min(max(effective_rounds, 1), MAX_DEBATE_ROUNDS)
+
+            async for event in run_iterative_debate(
+                body.content, search_context, request, body.execution_mode,
+                models_override=body.council_models,
+                chairman_override=body.chairman_model,
+                history=history,
+                debate_rounds=effective_rounds,
+            ):
+                event_type = event.get("type")
+                yield f"data: {json.dumps(event)}\n\n"
+                await asyncio.sleep(0.01)
+
+                if event_type == "debate_complete":
+                    rounds_data = event.get("rounds", [])
+                    debate_converged = event.get("converged", False)
+                    debate_critique_mode = event.get("critique_mode", "freeform")
+                    if rounds_data:
+                        last = rounds_data[-1]
+                        final_stage1 = last.get("stage1", [])
+                        final_stage2 = last.get("stage2") or []
+                        final_stage3 = last.get("stage3")
+                        last_meta = last.get("metadata", {})
+                        final_label_to_model = last_meta.get("label_to_model", {})
+                        final_aggregate_rankings = last_meta.get("aggregate_rankings", [])
+                        final_canonical_claims = last_meta.get("canonical_claims")
+                        final_aggregate_claim_verdicts = last_meta.get("aggregate_claim_verdicts")
+                    final_stage4 = event.get("stage4")
+
+            if title_task:
+                try:
+                    title = await title_task
+                    storage.update_conversation_title(conversation_id, title)
+                    conversation["title"] = title
+                    yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                except Exception as e:
+                    print(f"Error waiting for title task: {e}")
+
+            # Save assistant message with metadata
+            metadata = {
+                "execution_mode": body.execution_mode,
+                "critique_mode": debate_critique_mode,
+                "debate_rounds_configured": effective_rounds,
+                "debate_rounds_executed": len(rounds_data),
+                "converged": debate_converged,
+                "rounds": rounds_data,
+            }
+            if body.execution_mode in ["chat_ranking", "full"]:
+                metadata["label_to_model"] = final_label_to_model
+                metadata["aggregate_rankings"] = final_aggregate_rankings
+            if final_canonical_claims:
+                metadata["canonical_claims"] = final_canonical_claims
+            if final_aggregate_claim_verdicts:
+                metadata["aggregate_claim_verdicts"] = final_aggregate_claim_verdicts
+            if final_stage4:
+                metadata["stage4"] = final_stage4
+            if search_context:
+                metadata["search_context"] = search_context
+            if search_query:
+                metadata["search_query"] = search_query
+
+            storage.add_assistant_message(
+                conversation_id,
+                final_stage1,
+                final_stage2 if body.execution_mode in ["chat_ranking", "full"] else None,
+                final_stage3 if body.execution_mode == "full" else None,
+                metadata,
+                conversation=conversation
+            )
+
+            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+
+        except asyncio.CancelledError:
+            print(f"Stream cancelled for conversation {conversation_id}")
+            if title_task:
+                try:
+                    title = await asyncio.wait_for(title_task, timeout=2.0)
+                    storage.update_conversation_title(conversation_id, title)
+                except Exception as e:
+                    print(f"Could not save title during cancellation: {e}")
+            raise
+        except Exception as e:
+            print(f"Stream error: {e}")
+            storage.add_error_message(conversation_id, f"Error: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(
@@ -878,6 +1052,12 @@ class UpdateSettingsRequest(BaseModel):
     # Execution Mode
     execution_mode: Optional[str] = None
 
+    # Iterative Debate
+    critique_mode: Optional[str] = None
+    debate_rounds: Optional[int] = None
+    auto_converge: Optional[bool] = None
+    convergence_threshold: Optional[int] = None
+
     # System Prompts
     stage1_prompt: Optional[str] = None
     stage2_prompt: Optional[str] = None
@@ -972,6 +1152,12 @@ async def get_app_settings():
         "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
         "advisor_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.advisor_presets],
         "council_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.council_presets],
+
+        # Iterative Debate
+        "critique_mode": settings.critique_mode,
+        "debate_rounds": settings.debate_rounds,
+        "auto_converge": settings.auto_converge,
+        "convergence_threshold": settings.convergence_threshold,
     }
 
 
@@ -1160,6 +1346,21 @@ async def update_app_settings(request: UpdateSettingsRequest):
         _validate_execution_mode(request.execution_mode)
         updates["execution_mode"] = request.execution_mode
 
+    if request.critique_mode is not None:
+        if request.critique_mode not in ("freeform", "paragraph", "claim"):
+            raise HTTPException(status_code=400, detail="critique_mode must be freeform, paragraph, or claim")
+        updates["critique_mode"] = request.critique_mode
+    if request.debate_rounds is not None:
+        if not (1 <= request.debate_rounds <= MAX_DEBATE_ROUNDS):
+            raise HTTPException(status_code=400, detail=f"debate_rounds must be 1-{MAX_DEBATE_ROUNDS}")
+        updates["debate_rounds"] = request.debate_rounds
+    if request.auto_converge is not None:
+        updates["auto_converge"] = request.auto_converge
+    if request.convergence_threshold is not None:
+        if not (1 <= request.convergence_threshold <= 5):
+            raise HTTPException(status_code=400, detail="convergence_threshold must be 1-5")
+        updates["convergence_threshold"] = request.convergence_threshold
+
     if request.advisor_default_model is not None:
         updates["advisor_default_model"] = request.advisor_default_model
     if request.advisor_tiebreaker_model is not None:
@@ -1246,6 +1447,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
         "advisor_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.advisor_presets],
         "council_presets": [p.model_dump() if hasattr(p, "model_dump") else p for p in settings.council_presets],
+
+        # Iterative Debate
+        "critique_mode": settings.critique_mode,
+        "debate_rounds": settings.debate_rounds,
+        "auto_converge": settings.auto_converge,
+        "convergence_threshold": settings.convergence_threshold,
     }
 
 

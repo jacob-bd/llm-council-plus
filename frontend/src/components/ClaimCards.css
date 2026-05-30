@@ -1,0 +1,576 @@
+/* ========================================
+   Claim Cards — Council Chamber Theme
+   Uses design system tokens from index.css
+   ======================================== */
+
+.claim-cards {
+  margin-top: 20px;
+}
+
+/* --- Summary Bar --- */
+.claim-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.claim-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.claim-summary-icon { font-size: 20px; }
+
+.claim-summary-stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.claim-stat {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.claim-stat-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-code);
+}
+
+.claim-stat.contested .claim-stat-num { color: var(--verdict-flawed); }
+.claim-stat.strong .claim-stat-num { color: var(--verdict-strong); }
+
+/* --- All-Strong Banner --- */
+.claim-all-strong-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--verdict-strong-dim);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.claim-all-strong-banner .check-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--verdict-strong);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* --- Contested Section --- */
+.claim-contested-section {
+  margin-bottom: 20px;
+}
+
+.claim-section-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.contested-label { color: var(--verdict-flawed); }
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verdict-flawed);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+/* --- Detailed Claim Card --- */
+.claim-card-detailed {
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  margin-bottom: 10px;
+}
+
+.claim-card-detailed:hover {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Prominent contested cards */
+.claim-card-detailed.prominent {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.06), var(--shadow-soft);
+}
+
+.claim-card-detailed.prominent.flawed {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.claim-card-detailed.prominent.weak {
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.04);
+}
+
+/* Verdict-colored left border */
+.claim-card-detailed.strong { border-left: 3px solid rgba(34, 197, 94, 0.35); }
+.claim-card-detailed.flawed { border-left: 3px solid var(--verdict-flawed); }
+.claim-card-detailed.weak { border-left: 3px solid var(--verdict-weak); }
+.claim-card-detailed.unknown { border-left: 3px solid var(--border-glass); }
+
+/* --- Claim Header --- */
+.claim-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.claim-id {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  min-width: 28px;
+}
+
+.claim-source { font-size: 11px; color: var(--text-muted); }
+
+.claim-source-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.claim-verdict-badge {
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 5px;
+}
+
+.claim-verdict-badge.strong { color: var(--verdict-strong); background: var(--verdict-strong-dim); }
+.claim-verdict-badge.weak { color: var(--verdict-weak); background: var(--verdict-weak-dim); }
+.claim-verdict-badge.flawed { color: var(--verdict-flawed); background: var(--verdict-flawed-dim); }
+.claim-verdict-badge.unknown { color: var(--text-muted); background: rgba(255,255,255,0.04); }
+
+.claim-agreement {
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Claim Text --- */
+.claim-text {
+  font-family: var(--font-content);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+/* --- Evaluator Verdicts (expanded) --- */
+.claim-evaluators {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-glass);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evaluator-verdict {
+  display: grid;
+  grid-template-columns: 100px 60px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.ev-model {
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ev-verdict {
+  font-family: var(--font-code);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.ev-verdict.strong { color: var(--verdict-strong); }
+.ev-verdict.weak { color: var(--verdict-weak); }
+.ev-verdict.flawed { color: var(--verdict-flawed); }
+
+.ev-reason {
+  color: var(--text-muted);
+  font-family: var(--font-content);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* --- Strong Claims (collapsed toggle) --- */
+.claim-strong-section {
+  margin-top: 12px;
+}
+
+.claim-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--verdict-strong-dim);
+  border: 1px solid rgba(34, 197, 94, 0.12);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.claim-section-toggle:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.toggle-icon {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 14px;
+}
+
+.claim-section-toggle .claim-section-label {
+  margin: 0;
+  color: var(--verdict-strong);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.claim-section-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.claim-strong-list { margin-top: 10px; }
+
+/* --- Source Group (within strong list) --- */
+.claim-source-group { margin-bottom: 14px; }
+
+.claim-source-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.claim-source-label {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.claim-source-model {
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.claim-source-count {
+  margin-left: auto;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* --- Compact Claim Card --- */
+.claim-card-compact {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-left: 2px solid rgba(34, 197, 94, 0.2);
+  margin-left: 6px;
+}
+
+.claim-card-compact .claim-id {
+  font-size: 10px;
+  min-width: 26px;
+  flex-shrink: 0;
+}
+
+.claim-compact-text {
+  font-family: var(--font-content);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claim-compact-pct {
+  font-family: var(--font-code);
+  font-size: 10px;
+  color: rgba(34, 197, 94, 0.5);
+  flex-shrink: 0;
+}
+
+/* ========================================
+   Claim Evolution
+   ======================================== */
+
+.claim-evolution {
+  margin-top: 24px;
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.claim-evolution-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.claim-evolution-icon { font-size: 22px; }
+
+.claim-evolution-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* --- Round Bars --- */
+.claim-evolution-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evolution-round-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.evolution-round-badge {
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 3px 12px;
+  border-radius: 5px;
+  min-width: 68px;
+  text-align: center;
+}
+
+.evolution-round-stats {
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.evolution-bar-container {
+  display: flex;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+}
+
+.evolution-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-family: var(--font-code);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.evolution-bar.strong {
+  background: var(--verdict-strong-dim);
+  color: var(--verdict-strong);
+}
+
+.evolution-bar.contested {
+  background: var(--verdict-flawed-dim);
+  color: var(--verdict-flawed);
+}
+
+.evolution-arrow {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 18px;
+  padding: 6px 0;
+  opacity: 0.3;
+}
+
+/* --- Contested Claims Detail --- */
+.claim-evolution-contested {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-glass);
+}
+
+.evolution-contested-label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--verdict-flawed);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.evolution-contested-item {
+  display: grid;
+  grid-template-columns: 32px 36px 60px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.03);
+  border: 1px solid rgba(239, 68, 68, 0.08);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.evolution-claim-id {
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.evolution-claim-round {
+  font-family: var(--font-code);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.evolution-claim-verdict {
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.evolution-claim-verdict.flawed {
+  color: var(--verdict-flawed);
+  background: var(--verdict-flawed-dim);
+}
+
+.evolution-claim-verdict.weak {
+  color: var(--verdict-weak);
+  background: var(--verdict-weak-dim);
+}
+
+.evolution-claim-text {
+  font-family: var(--font-content);
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* --- Simple Card (extraction-only) --- */
+.claim-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.claim-card {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-card);
+}
+
+.claim-cards h4 {
+  font-family: var(--font-display);
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.claim-cards-description {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 14px 0;
+}

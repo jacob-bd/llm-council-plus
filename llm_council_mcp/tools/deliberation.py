@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from ..client import CouncilClient
-from ..stream_buffer import buffer_stage1, buffer_stage2, buffer_stage3
+from ..stream_buffer import buffer_stage1, buffer_stage2, buffer_stage3, buffer_iterative_debate
 
 
 def register(server, base_url: str) -> None:
@@ -129,5 +129,46 @@ def register(server, base_url: str) -> None:
                 "error": first.get("error"),
                 "web_search_used": web_search,
             }, indent=2)
+        except Exception as exc:
+            return json.dumps({"status": "error", "message": str(exc)}, indent=2)
+
+    @server.tool(description=(
+        "Run a multi-round iterative debate with convergence detection. "
+        "Models debate across rounds, refining answers based on peer feedback. "
+        "Supports 3 critique modes: 'freeform' (default), 'paragraph' (per-paragraph), "
+        "and 'claim' (per-claim with canonical claim extraction). "
+        "Returns all rounds data plus the chairman's corrected draft (Stage 4). "
+        "Set debate_rounds (1-5, default from settings) for number of rounds. "
+        "Auto-convergence stops early if rankings stabilize."
+    ))
+    async def run_iterative_debate(
+        query: str,
+        debate_rounds: int | None = None,
+        critique_mode: str | None = None,
+        web_search: bool = False,
+        models: list[str] | None = None,
+    ) -> str:
+        try:
+            async with CouncilClient(base_url) as client:
+                if critique_mode:
+                    critique_mode = critique_mode.strip().lower()
+                    if critique_mode not in ("freeform", "paragraph", "claim"):
+                        return "Error: critique_mode must be freeform, paragraph, or claim."
+                    await client.update_settings(critique_mode=critique_mode)
+
+                conv = await client.create_conversation()
+                conversation_id = conv["id"]
+
+                events = client.stream_debate_message(
+                    conversation_id,
+                    query,
+                    web_search=web_search,
+                    execution_mode="full",
+                    council_models=models,
+                    debate_rounds=debate_rounds,
+                )
+
+                result = await buffer_iterative_debate(events, conversation_id)
+                return json.dumps(result, indent=2)
         except Exception as exc:
             return json.dumps({"status": "error", "message": str(exc)}, indent=2)

@@ -3,7 +3,9 @@ import Skeleton from './common/Skeleton';
 import MarkdownContent from './MarkdownContent';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
 import RankingHeatmap from './RankingHeatmap';
+import { ClaimCardWithVerdicts } from './ClaimCards';
 import './Stage2.css';
+import './ClaimCards.css';
 import StageTimer from './StageTimer';
 
 function deAnonymizeText(text, labelToModel) {
@@ -24,7 +26,7 @@ function hexToRgb(hex) {
     return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 255';
 }
 
-export default function Stage2({ rankings, labelToModel, aggregateRankings, startTime, endTime }) {
+export default function Stage2({ rankings, labelToModel, aggregateRankings, startTime, endTime, canonicalClaims, aggregateClaimVerdicts }) {
     const [activeTab, setActiveTab] = useState(0);
     const [viewMode, setViewMode] = useState('leaderboard'); // 'leaderboard' or 'heatmap'
 
@@ -53,6 +55,8 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
     const anonymizedLabelText = labelToModel
         ? Object.keys(labelToModel).join(', ')
         : 'Response A, Response B, etc.';
+
+    const isClaimMode = !!(canonicalClaims && aggregateClaimVerdicts);
 
     // Copy functionality
     const [isCopied, setIsCopied] = useState(false);
@@ -88,122 +92,61 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                 <StageTimer startTime={startTime} endTime={endTime} label="Duration" />
             </div>
 
-            <h4>Raw Evaluations</h4>
-            <p className="stage-description">
-                Each model evaluated all responses (anonymized as {anonymizedLabelText}) and provided rankings.
-                Below, model names are shown in <strong>bold</strong> for readability, but the original evaluation used anonymous labels.
-            </p>
+            {/* Claim Mode: show ClaimCards as the primary view */}
+            {isClaimMode && (
+                <ClaimCardWithVerdicts
+                    claims={canonicalClaims}
+                    aggregatedVerdicts={aggregateClaimVerdicts}
+                    labelToModel={labelToModel}
+                    stage2Results={rankings}
+                />
+            )}
 
-            {/* Avatar Tabs */}
-            <div className="tabs">
-                {rankings.map((rank, index) => {
-                    const visuals = getModelVisuals(rank?.model);
-                    const shortName = getShortModelName(rank?.model);
-
-                    return (
-                        <button
-                            key={index}
-                            className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
-                            onClick={() => setActiveTab(index)}
-                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
-                            title={rank?.model}
-                        >
-                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
-                                {visuals.icon}
-                            </span>
-                            <span className="tab-name">{shortName}</span>
-                            {rank?.error && <span className="error-badge">!</span>}
-                        </button>
-                    );
-                })}
-            </div>
-
-            <div className="tab-content glass-panel">
-                <div className="model-header">
-                    <div className="model-identity">
-                        <span className="model-avatar" style={{ backgroundColor: hasError ? '#ef4444' : currentVisuals.color }}>
-                            {currentVisuals.icon}
-                        </span>
-                        <div className="model-info">
-                            <span className="model-name-large">{currentRanking.model || 'Unknown Model'}</span>
-                            <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
-                                {currentVisuals.name}
-                            </span>
-                        </div>
+            {isClaimMode ? (
+                <details className="raw-evaluations-collapse">
+                    <summary className="raw-evaluations-toggle">
+                        Show Raw Evaluations ({rankings?.length || 0} evaluators)
+                    </summary>
+                    <div style={{ marginTop: '12px' }}>
+                        <RawEvaluationTabs
+                            rankings={rankings}
+                            labelToModel={labelToModel}
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            currentRanking={currentRanking}
+                            currentVisuals={currentVisuals}
+                            hasError={hasError}
+                            isCopied={isCopied}
+                            handleCopy={handleCopy}
+                            safeActiveTab={safeActiveTab}
+                            anonymizedLabelText={anonymizedLabelText}
+                            parsedRanking={parsedRanking}
+                        />
                     </div>
-
-                    <div className="header-actions">
-                        {!hasError && (
-                            <button
-                                className={`copy-button ${isCopied ? 'copied' : ''}`}
-                                onClick={handleCopy}
-                                title="Copy to clipboard"
-                            >
-                                {isCopied ? (
-                                    <>
-                                        <span className="icon">✓</span>
-                                        <span className="label">Copied</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="icon">📋</span>
-                                        <span className="label">Copy</span>
-                                    </>
-                                )}
-                            </button>
-                        )}
-
-                        {hasError ? (
-                            <span className="model-status error">Failed</span>
-                        ) : (
-                            <span className="model-status success">Completed</span>
-                        )}
-                    </div>
-                </div>
-
-                {hasError ? (
-                    <div className="response-error">
-                        <div className="error-icon">⚠️</div>
-                        <div className="error-details">
-                            <div className="error-title">Model Failed to Respond</div>
-                            <div className="error-message">{currentRanking?.error_message || 'Unknown error'}</div>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        <MarkdownContent className="ranking-content">
-                            {(() => {
-                                const ranking = currentRanking?.ranking;
-                                const rankingText = typeof ranking === 'string' ? ranking : String(ranking || '');
-                                return deAnonymizeText(rankingText, labelToModel);
-                            })()}
-                        </MarkdownContent>
-
-                        {parsedRanking.length > 0 && (
-                                <div className="parsed-ranking">
-                                    <strong>Extracted Ranking:</strong>
-                                    <span className="info-tooltip-container">
-                                        <span className="info-icon">?</span>
-                                        <span className="info-tooltip">
-                                            This is the ranking parsed from the model's text response.
-                                            It's used to calculate the aggregate rankings below.
-                                            Compare with the text above to verify the system correctly understood the model's ranking.
-                                        </span>
-                                    </span>
-                                    <ol>
-                                        {parsedRanking.map((label, i) => (
-                                            <li key={i}>
-                                                {labelToModel && labelToModel[label]
-                                                    ? getShortModelName(labelToModel[label])
-                                                    : label}
-                                            </li>
-                                        ))}
-                                    </ol>
-                                </div>
-                            )}
-                    </>
-                )}
-            </div>
+                </details>
+            ) : (
+                <>
+                    <h4>Raw Evaluations</h4>
+                    <p className="stage-description">
+                        Each model evaluated all responses (anonymized as {anonymizedLabelText}) and provided rankings.
+                        Below, model names are shown in <strong>bold</strong> for readability, but the original evaluation used anonymous labels.
+                    </p>
+                    <RawEvaluationTabs
+                        rankings={rankings}
+                        labelToModel={labelToModel}
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        currentRanking={currentRanking}
+                        currentVisuals={currentVisuals}
+                        hasError={hasError}
+                        isCopied={isCopied}
+                        handleCopy={handleCopy}
+                        safeActiveTab={safeActiveTab}
+                        anonymizedLabelText={anonymizedLabelText}
+                        parsedRanking={parsedRanking}
+                    />
+                </>
+            )}
 
             {aggregateRankings && aggregateRankings.length > 0 && (
                 <div className="aggregate-rankings">
@@ -356,5 +299,135 @@ export function Stage2Skeleton() {
                 </div>
             </div>
         </div>
+    );
+}
+
+function RawEvaluationTabs({
+    rankings,
+    labelToModel,
+    activeTab,
+    setActiveTab,
+    currentRanking,
+    currentVisuals,
+    hasError,
+    isCopied,
+    handleCopy,
+    safeActiveTab,
+    anonymizedLabelText,
+    parsedRanking
+}) {
+    return (
+        <>
+            {/* Avatar Tabs */}
+            <div className="tabs">
+                {rankings.map((rank, index) => {
+                    const visuals = getModelVisuals(rank?.model);
+                    const shortName = getShortModelName(rank?.model);
+
+                    return (
+                        <button
+                            key={index}
+                            className={`tab ${safeActiveTab === index ? 'active' : ''} ${rank?.error ? 'tab-error' : ''}`}
+                            onClick={() => setActiveTab(index)}
+                            style={safeActiveTab === index ? { borderColor: visuals.color, color: visuals.color } : {}}
+                            title={rank?.model}
+                        >
+                            <span className="tab-icon" style={{ backgroundColor: safeActiveTab === index ? 'transparent' : 'rgba(255,255,255,0.1)' }}>
+                                {visuals.icon}
+                            </span>
+                            <span className="tab-name">{shortName}</span>
+                            {rank?.error && <span className="error-badge">!</span>}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="tab-content glass-panel">
+                <div className="model-header">
+                    <div className="model-identity">
+                        <span className="model-avatar" style={{ backgroundColor: hasError ? '#ef4444' : currentVisuals.color }}>
+                            {currentVisuals.icon}
+                        </span>
+                        <div className="model-info">
+                            <span className="model-name-large">{currentRanking.model || 'Unknown Model'}</span>
+                            <span className="model-provider-badge" style={{ borderColor: currentVisuals.color, color: currentVisuals.color }}>
+                                {currentVisuals.name}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="header-actions">
+                        {!hasError && (
+                            <button
+                                className={`copy-button ${isCopied ? 'copied' : ''}`}
+                                onClick={handleCopy}
+                                title="Copy to clipboard"
+                            >
+                                {isCopied ? (
+                                    <>
+                                        <span className="icon">✓</span>
+                                        <span className="label">Copied</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="icon">📋</span>
+                                        <span className="label">Copy</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
+
+                        {hasError ? (
+                            <span className="model-status error">Failed</span>
+                        ) : (
+                            <span className="model-status success">Completed</span>
+                        )}
+                    </div>
+                </div>
+
+                {hasError ? (
+                    <div className="response-error">
+                        <div className="error-icon">⚠️</div>
+                        <div className="error-details">
+                            <div className="error-title">Model Failed to Respond</div>
+                            <div className="error-message">{currentRanking?.error_message || 'Unknown error'}</div>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <MarkdownContent className="ranking-content">
+                            {(() => {
+                                const ranking = currentRanking?.ranking;
+                                const rankingText = typeof ranking === 'string' ? ranking : String(ranking || '');
+                                return deAnonymizeText(rankingText, labelToModel);
+                            })()}
+                        </MarkdownContent>
+
+                        {parsedRanking.length > 0 && (
+                            <div className="parsed-ranking">
+                                <strong>Extracted Ranking:</strong>
+                                <span className="info-tooltip-container">
+                                    <span className="info-icon">?</span>
+                                    <span className="info-tooltip">
+                                        This is the ranking parsed from the model's text response.
+                                        It's used to calculate the aggregate rankings below.
+                                        Compare with the text above to verify the system correctly understood the model's ranking.
+                                    </span>
+                                </span>
+                                <ol>
+                                    {parsedRanking.map((label, i) => (
+                                        <li key={i}>
+                                            {labelToModel && labelToModel[label]
+                                                ? getShortModelName(labelToModel[label])
+                                                : label}
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </>
     );
 }

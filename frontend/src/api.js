@@ -462,4 +462,49 @@ export const api = {
 
     await _consumeSSEStream(response.body, onEvent);
   },
+
+  /**
+   * Send a message and stream the multi-round iterative debate process.
+   */
+  async streamDebateMessage(conversationId, options, onEvent, signal) {
+    const {
+      content,
+      searchProvider = null,
+      executionMode = 'full',
+      councilModels = null,
+      chairmanModel = null,
+      debateRounds = null,
+    } = options;
+    const body = {
+      content,
+      search_provider: searchProvider,
+      execution_mode: executionMode,
+      debate_rounds: debateRounds,
+    };
+    if (councilModels && councilModels.length > 0) {
+      body.council_models = councilModels;
+    }
+    if (chairmanModel) {
+      body.chairman_model = chairmanModel;
+    }
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/message/debate?_t=${Date.now()}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify(body),
+        signal,
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to start debate stream');
+    }
+
+    await _consumeSSEStream(response.body, onEvent);
+  },
 };

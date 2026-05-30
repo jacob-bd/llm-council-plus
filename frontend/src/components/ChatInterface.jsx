@@ -10,6 +10,8 @@ import ExecutionModeToggle from './ExecutionModeToggle';
 import DebateView from './DebateView';
 import AdvisorSetup from './AdvisorSetup';
 import MarkdownContent from './MarkdownContent';
+import Stage4, { Stage4Skeleton } from './Stage4';
+import RoundNavigator from './RoundNavigator';
 import './ChatInterface.css';
 
 function hasStage1Results(msg) {
@@ -249,110 +251,19 @@ export default function ChatInterface({
                                         error={msg.error || null}
                                     />
                                 ) : (
-                                    <>
-                                        {msg.error && (
-                                            <div className="council-error">
-                                                <span className="council-error-icon">⚠️</span>
-                                                <span className="council-error-text">{msg.error}</span>
-                                            </div>
-                                        )}
-
-                                        {isCouncilTurnPending(msg, isActiveCouncilTurn, isLoading) && (
-                                            <div className="stage-loading">
-                                                <div className="spinner"></div>
-                                                <span>Consulting the council…</span>
-                                            </div>
-                                        )}
-
-                                        {/* Search Loading */}
-                                        {msg.loading?.search && (
-                                            <div className="stage-loading">
-                                                <div className="spinner"></div>
-                                                <span>
-                                                    🔍 Searching the web with {availableSearchProviders.find(p => p.id === (activeSearchProvider || searchProvider))?.name || 'Web'}...
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {/* Search Context */}
-                                        {msg.metadata?.search_context && (
-                                            <SearchContext
-                                                searchQuery={msg.metadata?.search_query}
-                                                extractedQuery={msg.metadata?.extracted_query}
-                                                searchContext={msg.metadata?.search_context}
-                                            />
-                                        )}
-
-                                        {/* Stage 1: Council Grid Visualization (during deliberation only) */}
-                                        {shouldShowStage1CouncilGrid(msg) && (
-                                            <div className="stage-container">
-                                                <div className="stage-header">
-                                                    <h3>Stage 1: Council Deliberation</h3>
-                                                    {msg.timers?.stage1Start && (
-                                                        <StageTimer
-                                                            startTime={msg.timers.stage1Start}
-                                                            endTime={msg.timers.stage1End}
-                                                        />
-                                                    )}
-                                                </div>
-                                                <CouncilGrid
-                                                    models={councilModels}
-                                                    chairman={chairmanModel}
-                                                    status={msg.loading?.stage1 ? 'thinking' : 'complete'}
-                                                    progress={{
-                                                        currentModel: msg.progress?.stage1?.currentModel,
-                                                        completed: msg.stage1?.map(r => r.model) || []
-                                                    }}
-                                                    showChairman={(msg.metadata?.execution_mode || executionMode) === 'full'}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {renderStage1Content(msg)}
-
-                                        {/* Stage 2 */}
-                                        <div
-                                            ref={isActiveCouncilTurn ? stage2AnchorRef : null}
-                                            className="stage-scroll-anchor"
-                                        >
-                                            {msg.loading?.stage2 && <Stage2Skeleton />}
-                                            {hasStage2Results(msg) && (
-                                                <Stage2
-                                                    rankings={msg.stage2}
-                                                    labelToModel={msg.metadata?.label_to_model}
-                                                    aggregateRankings={msg.metadata?.aggregate_rankings}
-                                                    startTime={msg.timers?.stage2Start}
-                                                    endTime={msg.timers?.stage2End}
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Stage 3 */}
-                                        <div
-                                            ref={isActiveCouncilTurn ? stage3AnchorRef : null}
-                                            className="stage-scroll-anchor"
-                                        >
-                                            {msg.loading?.stage3 && <Stage3Skeleton />}
-                                            {msg.stage3 && (
-                                                <Stage3
-                                                    finalResponse={msg.stage3}
-                                                    startTime={msg.timers?.stage3Start}
-                                                    endTime={msg.timers?.stage3End}
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Aborted Indicator */}
-                                        {msg.aborted && (
-                                            <div className="aborted-indicator">
-                                                <span className="aborted-icon">⏹</span>
-                                                <span className="aborted-text">
-                                                    Generation stopped by user.
-                                                    {hasStage1Results(msg) && !msg.stage3 && ' Partial results shown above.'}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </>
+                                    <CouncilMessageRenderer
+                                        msg={msg}
+                                        isActiveCouncilTurn={isActiveCouncilTurn}
+                                        councilModels={councilModels}
+                                        chairmanModel={chairmanModel}
+                                        executionMode={executionMode}
+                                        availableSearchProviders={availableSearchProviders}
+                                        searchProvider={searchProvider}
+                                        activeSearchProvider={activeSearchProvider}
+                                        isLoading={isLoading}
+                                        stage2AnchorRef={stage2AnchorRef}
+                                        stage3AnchorRef={stage3AnchorRef}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -452,5 +363,200 @@ export default function ChatInterface({
                 )}
             </div>}
         </div>
+    );
+}
+
+function CouncilMessageRenderer({
+    msg,
+    isActiveCouncilTurn,
+    councilModels,
+    chairmanModel,
+    executionMode,
+    availableSearchProviders,
+    searchProvider,
+    activeSearchProvider,
+    isLoading,
+    stage2AnchorRef,
+    stage3AnchorRef,
+}) {
+    const [selectedRound, setSelectedRound] = useState(null);
+
+    const hasRounds = Array.isArray(msg.metadata?.rounds) && msg.metadata.rounds.length > 0;
+    const totalRounds = hasRounds 
+        ? msg.metadata.rounds.length 
+        : (msg.metadata?.debate_rounds_configured || 1);
+    const currentActiveRound = msg.metadata?.current_round || 1;
+
+    useEffect(() => {
+        if (!hasRounds) {
+            setSelectedRound(null);
+        }
+    }, [hasRounds]);
+
+    const activeRoundNum = selectedRound !== null 
+        ? selectedRound 
+        : (hasRounds ? msg.metadata.rounds.length : currentActiveRound);
+
+    let displayStage1 = msg.stage1;
+    let displayStage2 = msg.stage2;
+    let displayStage3 = msg.stage3;
+    let displayMetadata = msg.metadata || {};
+
+    if (hasRounds && msg.metadata.rounds[activeRoundNum - 1]) {
+        const roundData = msg.metadata.rounds[activeRoundNum - 1];
+        displayStage1 = roundData.stage1;
+        displayStage2 = roundData.stage2;
+        displayStage3 = roundData.stage3;
+        displayMetadata = { ...msg.metadata, ...(roundData.metadata || {}) };
+    }
+
+    const showStage1 = msg.loading?.stage1 || (Array.isArray(displayStage1) && displayStage1.length > 0);
+    const showStage2 = msg.loading?.stage2 || (Array.isArray(displayStage2) && displayStage2.length > 0);
+    const showStage3 = msg.loading?.stage3 || displayStage3;
+    const showStage4 = msg.loading?.stage4 || displayMetadata.stage4;
+
+    return (
+        <>
+            {msg.error && (
+                <div className="council-error">
+                    <span className="council-error-icon">⚠️</span>
+                    <span className="council-error-text">{msg.error}</span>
+                </div>
+            )}
+
+            {isCouncilTurnPending(msg, isActiveCouncilTurn, isLoading) && (
+                <div className="stage-loading">
+                    <div className="spinner"></div>
+                    <span>Consulting the council…</span>
+                </div>
+            )}
+
+            {/* Search Loading */}
+            {msg.loading?.search && (
+                <div className="stage-loading">
+                    <div className="spinner"></div>
+                    <span>
+                        🔍 Searching the web with {availableSearchProviders.find(p => p.id === (activeSearchProvider || searchProvider))?.name || 'Web'}...
+                    </span>
+                </div>
+            )}
+
+            {/* Search Context */}
+            {displayMetadata.search_context && (
+                <SearchContext
+                    searchQuery={displayMetadata.search_query}
+                    extractedQuery={displayMetadata.extracted_query}
+                    searchContext={displayMetadata.search_context}
+                />
+            )}
+
+            {/* Round Navigator */}
+            {totalRounds > 1 && (
+                <RoundNavigator
+                    currentRound={activeRoundNum}
+                    totalRounds={totalRounds}
+                    converged={displayMetadata.converged}
+                    onSelectRound={hasRounds ? setSelectedRound : null}
+                />
+            )}
+
+            {/* Stage 1: Council Grid (during active round deliberation only) */}
+            {shouldShowStage1CouncilGrid(msg) && (
+                <div className="stage-container">
+                    <div className="stage-header">
+                        <h3>Stage 1: Council Deliberation {totalRounds > 1 && `(Round ${activeRoundNum})`}</h3>
+                        {msg.timers?.stage1Start && (
+                            <StageTimer
+                                startTime={msg.timers.stage1Start}
+                                endTime={msg.timers.stage1End}
+                            />
+                        )}
+                    </div>
+                    <CouncilGrid
+                        models={councilModels}
+                        chairman={chairmanModel}
+                        status={msg.loading?.stage1 ? 'thinking' : 'complete'}
+                        progress={{
+                            currentModel: msg.progress?.stage1?.currentModel,
+                            completed: displayStage1?.map(r => r.model) || []
+                        }}
+                        showChairman={(displayMetadata.execution_mode || executionMode) === 'full'}
+                    />
+                </div>
+            )}
+
+            {/* Stage 1 Content */}
+            {showStage1 && (
+                msg.loading?.stage1 && (!displayStage1 || displayStage1.length === 0) ? (
+                    <Stage1Skeleton />
+                ) : (
+                    <Stage1
+                        responses={displayStage1 || []}
+                        startTime={msg.timers?.stage1Start}
+                        endTime={msg.timers?.stage1End}
+                    />
+                )
+            )}
+
+            {/* Stage 2 */}
+            <div
+                ref={isActiveCouncilTurn ? stage2AnchorRef : null}
+                className="stage-scroll-anchor"
+            >
+                {msg.loading?.stage2 && (!displayStage2 || displayStage2.length === 0) && <Stage2Skeleton />}
+                {Array.isArray(displayStage2) && displayStage2.length > 0 && (
+                    <Stage2
+                        rankings={displayStage2}
+                        labelToModel={displayMetadata.label_to_model}
+                        aggregateRankings={displayMetadata.aggregate_rankings}
+                        canonicalClaims={displayMetadata.canonical_claims}
+                        aggregateClaimVerdicts={displayMetadata.aggregate_claim_verdicts}
+                        startTime={msg.timers?.stage2Start}
+                        endTime={msg.timers?.stage2End}
+                    />
+                )}
+            </div>
+
+            {/* Stage 3 */}
+            <div
+                ref={isActiveCouncilTurn ? stage3AnchorRef : null}
+                className="stage-scroll-anchor"
+            >
+                {msg.loading?.stage3 && !displayStage3 && <Stage3Skeleton />}
+                {displayStage3 && (
+                    <Stage3
+                        finalResponse={displayStage3}
+                        startTime={msg.timers?.stage3Start}
+                        endTime={msg.timers?.stage3End}
+                    />
+                )}
+            </div>
+
+            {/* Stage 4 */}
+            {showStage4 && (
+                <div className="stage-scroll-anchor">
+                    {msg.loading?.stage4 && !displayMetadata.stage4 ? (
+                        <Stage4Skeleton />
+                    ) : (
+                        <Stage4
+                            correctedDraft={displayMetadata.stage4}
+                            startTime={msg.timers?.stage4Start || msg.timers?.stage3End}
+                            endTime={msg.timers?.stage4End}
+                        />
+                    )}
+                </div>
+            )}
+
+            {/* Aborted Indicator */}
+            {msg.aborted && (
+                <div className="aborted-indicator">
+                    <span className="aborted-icon">⏹</span>
+                    <span className="aborted-text">
+                        Generation stopped by user.
+                        {displayStage1 && !displayStage3 && ' Partial results shown above.'}
+                    </span>
+                </div>
+            )}
+        </>
     );
 }

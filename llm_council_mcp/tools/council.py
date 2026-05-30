@@ -37,6 +37,8 @@ def register(server, base_url: str) -> None:
         council_models: list[str] | None = None,
         chairman_model: str | None = None,
         is_default: bool = False,
+        critique_mode: str | None = None,
+        debate_rounds: int | None = None,
     ) -> str:
         action = action.strip().lower()
         valid = ("get", "update", "list_presets", "save_preset", "delete_preset", "set_default_preset")
@@ -55,6 +57,10 @@ def register(server, base_url: str) -> None:
                         "stage2_temperature": settings.get("stage2_temperature"),
                         "execution_mode": settings.get("execution_mode"),
                         "search_provider": settings.get("search_provider"),
+                        "critique_mode": settings.get("critique_mode"),
+                        "debate_rounds": settings.get("debate_rounds"),
+                        "auto_converge": settings.get("auto_converge"),
+                        "convergence_threshold": settings.get("convergence_threshold"),
                         "council_presets": settings.get("council_presets", []),
                     }
                     return json.dumps(config, indent=2)
@@ -118,6 +124,15 @@ def register(server, base_url: str) -> None:
                     updates["enabled_providers"] = enabled_providers
                 if direct_provider_toggles is not None:
                     updates["direct_provider_toggles"] = direct_provider_toggles
+                if critique_mode is not None:
+                    critique_mode = critique_mode.strip().lower()
+                    if critique_mode not in ("freeform", "paragraph", "claim"):
+                        return "Error: critique_mode must be freeform, paragraph, or claim."
+                    updates["critique_mode"] = critique_mode
+                if debate_rounds is not None:
+                    if not (1 <= debate_rounds <= 5):
+                        return "Error: debate_rounds must be between 1 and 5."
+                    updates["debate_rounds"] = debate_rounds
 
                 if not updates:
                     return "Error: no update fields provided."

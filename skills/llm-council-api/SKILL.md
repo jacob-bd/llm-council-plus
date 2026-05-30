@@ -1,7 +1,7 @@
 ---
 name: llm-council-api
-version: 0.6.1
-description: LLM Council Plus — MCP-first (9 action-based tools) when the llm-council-plus MCP server is connected; REST/curl fallback when MCP is unavailable, for cron scripts, or raw SSE. Triggers on "ask the council", "run a debate", "configure models", "run a deliberation", "check council health", etc.
+version: 0.7.0
+description: LLM Council Plus — MCP-first (10 action-based tools) when the llm-council-plus MCP server is connected; REST/curl fallback when MCP is unavailable, for cron scripts, or raw SSE. Triggers on "ask the council", "run a debate", "configure models", "run a deliberation", "check council health", etc.
 ---
 
 # LLM Council Plus — API & MCP Skill
@@ -15,7 +15,7 @@ LLM Council Plus has two operating modes:
 
 **Transport rule (read first):** If LLM Council Plus **MCP tools are available** in your session, **call them** — do **not** shell out to `curl` for the same operation. This skill’s REST sections are the **fallback reference** when MCP is missing, the SSE session is stale, or you need raw SSE/admin export.
 
-**MCP server (v0.6.1):** Built-in SSE at `http://localhost:8001/mcp/sse` (stdio: `python -m llm_council_mcp`). Exposes **9 action-based tools** (not 25). Verify via `GET /api/health` → `"mcp": {"tools": 9, "sse_url": "..."}`.
+**MCP server (v0.7.0):** Built-in SSE at `http://localhost:8001/mcp/sse` (stdio: `python -m llm_council_mcp`). Exposes **10 action-based tools** (not 25). Verify via `GET /api/health` → `"mcp": {"tools": 10, "sse_url": "..."}`.
 
 **Default base URL (REST fallback only):** `http://localhost:8001`  
 **Remote server:** replace with `http://<server-ip>:8001`
@@ -26,7 +26,7 @@ LLM Council Plus has two operating modes:
 
 ### When to use MCP (preferred)
 
-Use MCP when your tool list includes any of these **9 tools** (server may appear as `llm-council-plus`, `llm-council`, or `user-llm-council-plus`):
+Use MCP when your tool list includes any of these **10 tools** (server may appear as `llm-council-plus`, `llm-council`, or `user-llm-council-plus`):
 
 | You want to… | MCP tool | Action(s) | Do **not** use curl |
 |--------------|----------|-----------|---------------------|
@@ -48,16 +48,18 @@ Use MCP when your tool list includes any of these **9 tools** (server may appear
 | Update advisor defaults | `advisor_settings` | `update` | ~~`PUT /api/settings`~~ (advisor fields) |
 | Advisor preset CRUD | `advisor_settings` | `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | ~~`PUT /api/settings`~~ |
 | Run advisor debate | `advisor_debate` | _(direct params)_ | ~~`debate/stream`~~ |
+| Run multi-round debate | `run_iterative_debate` | _(direct params)_ | ~~debate message endpoints~~ |
 
-**Breaking change (v0.5.2):** Legacy 25-tool names (`run_deliberation`, `get_council_config`, `check_health`, etc.) were removed. Always use the 9 tools above with `action` parameters.
+**Breaking change (v0.5.2):** Legacy 25-tool names (`run_deliberation`, `get_council_config`, `check_health`, etc.) were removed. Always use the 10 tools above with `action` parameters.
 
-## MCP Tool Catalog (9 tools)
+## MCP Tool Catalog (10 tools)
 
 | Tool | Actions / usage |
 |------|-----------------|
 | `council_deliberate` | `stage1`, `stage2`, `stage3`, `full` |
 | `model_chat` | `quick`, `multi_turn` |
 | `advisor_debate` | Direct params: `question`, `persona_ids` (2–4), optional `max_rounds`, models |
+| `run_iterative_debate` | Direct params: `query`, optional `debate_rounds`, `critique_mode`, `web_search`, models |
 | `council_settings` | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` |
 | `advisor_settings` | Same preset actions + `get`, `update` |
 | `personas` | `list`, `get`, `update`, `reset` |
@@ -92,7 +94,7 @@ Use this table **only when MCP tools are unavailable** or the operation has no M
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Health check | GET | `/api/health` (includes `"mcp": {"tools": 9}`) |
+| Health check | GET | `/api/health` (includes `"mcp": {"tools": 10}`) |
 | **One-shot query (no state)** | **POST** | **`/api/ask`** |
 | Get settings (council + advisor config) | GET | `/api/settings` |
 | Update settings | PUT | `/api/settings` |

@@ -149,6 +149,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [activePromptTab, setActivePromptTab] = useState('stage1');
   const [activeAdvisorPromptTab, setActiveAdvisorPromptTab] = useState('advisor_round1');
 
+  // Debate Settings
+  const [critiqueMode, setCritiqueMode] = useState('freeform');
+  const [debateRounds, setDebateRounds] = useState(1);
+  const [autoConverge, setAutoConverge] = useState(true);
+  const [convergenceThreshold, setConvergenceThreshold] = useState(2);
+
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -462,6 +468,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
       // Prompts
       setPrompts(normalizedPrompts);
+
+      // Debate Settings
+      setCritiqueMode(data.critique_mode || 'freeform');
+      setDebateRounds(data.debate_rounds || 1);
+      setAutoConverge(data.auto_converge !== undefined ? data.auto_converge : true);
+      setConvergenceThreshold(data.convergence_threshold || 2);
 
       // Clear Direct Keys (for security)
       setDirectKeys({
@@ -1067,6 +1079,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setShowFreeOnly(false);
       setOllamaBaseUrl('http://localhost:11434');
 
+      // Reset debate settings
+      setCritiqueMode('freeform');
+      setDebateRounds(1);
+      setAutoConverge(true);
+      setConvergenceThreshold(2);
+
       // 4. Reset Prompts to System Defaults (keep these useful)
       const defaults = await api.getDefaultSettings();
       const defaultPrompts = buildPromptValues(defaults);
@@ -1099,6 +1117,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         council_member_filters: { 0: 'remote', 1: 'remote' },
         chairman_filter: 'remote',
         search_query_filter: 'remote',
+        critique_mode: 'freeform',
+        debate_rounds: 1,
+        auto_converge: true,
+        convergence_threshold: 2,
         ...defaultPrompts,
       };
       await api.updateSettings(updates);
@@ -1339,6 +1361,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         // Remote/Local filters for each selection
         council_member_filters: councilMemberFilters,
         chairman_filter: chairmanFilter,
+        // Debate Settings
+        critique_mode: critiqueMode,
+        debate_rounds: debateRounds,
+        auto_converge: autoConverge,
+        convergence_threshold: convergenceThreshold,
         // Prompts
         ...prompts
       };
@@ -1635,6 +1662,15 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 setCouncilTemperature={setCouncilTemperature}
                 chairmanTemperature={chairmanTemperature}
                 setChairmanTemperature={setChairmanTemperature}
+                // Debate state
+                critiqueMode={critiqueMode}
+                setCritiqueMode={setCritiqueMode}
+                debateRounds={debateRounds}
+                setDebateRounds={setDebateRounds}
+                autoConverge={autoConverge}
+                setAutoConverge={setAutoConverge}
+                convergenceThreshold={convergenceThreshold}
+                setConvergenceThreshold={setConvergenceThreshold}
                 // Data
                 allModels={allAvailableModels}
                 filteredModels={filteredAvailableModels}

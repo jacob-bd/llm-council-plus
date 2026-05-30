@@ -57,6 +57,10 @@ function App() {
   const [searchProvider, setSearchProvider] = useState('duckduckgo');
   const [availableSearchProviders, setAvailableSearchProviders] = useState([{ id: 'duckduckgo', name: 'DuckDuckGo' }]);
   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
+  const [critiqueMode, setCritiqueMode] = useState('freeform');
+  const [debateRounds, setDebateRounds] = useState(1);
+  const [autoConverge, setAutoConverge] = useState(true);
+  const [convergenceThreshold, setConvergenceThreshold] = useState(2);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [appMode, setAppMode] = useState(null); // null shows landing page
   const abortControllerRef = useRef(null);
@@ -108,6 +112,11 @@ function App() {
       // Load execution mode preference
       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
       setSearchProvider(settings.search_provider || 'duckduckgo');
+
+      setCritiqueMode(settings.critique_mode || 'freeform');
+      setDebateRounds(settings.debate_rounds || 1);
+      setAutoConverge(settings.auto_converge !== undefined ? settings.auto_converge : true);
+      setConvergenceThreshold(settings.convergence_threshold || 2);
 
       setAvailableSearchProviders(buildAvailableSearchProviders(settings));
 
@@ -175,6 +184,11 @@ function App() {
       setSearchProvider(settings.search_provider || 'duckduckgo');
       setAvailableSearchProviders(buildAvailableSearchProviders(settings));
       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
+
+      setCritiqueMode(settings.critique_mode || 'freeform');
+      setDebateRounds(settings.debate_rounds || 1);
+      setAutoConverge(settings.auto_converge !== undefined ? settings.auto_converge : true);
+      setConvergenceThreshold(settings.convergence_threshold || 2);
 
       setCouncilConfigured(computeCouncilConfigured(
         models,
@@ -647,15 +661,22 @@ function App() {
       }));
 
       // Send message with streaming
-      await api.sendMessageStream(
+      const isDebate = debateRounds > 1 || critiqueMode !== 'freeform';
+      const streamMethod = isDebate ? api.streamDebateMessage.bind(api) : api.sendMessageStream.bind(api);
+      const streamOptions = {
+        content,
+        searchProvider,
+        executionMode,
+        councilModels,
+        chairmanModel: executionMode === 'full' ? chairmanModel : undefined,
+      };
+      if (isDebate) {
+        streamOptions.debateRounds = debateRounds;
+      }
+
+      await streamMethod(
         activeConversationId,
-        {
-          content,
-          searchProvider,
-          executionMode,
-          councilModels,
-          chairmanModel: executionMode === 'full' ? chairmanModel : undefined,
-        },
+        streamOptions,
         (eventType, event) => {
           switch (eventType) {
             case 'search_start':
@@ -939,6 +960,181 @@ function App() {
               });
               // Hide loading indicator once final answer is shown
               setIsLoading(false);
+              break;
+
+            case 'round_start':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const round = event.round;
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  stage1: round > 1 ? null : lastMsg.stage1,
+                  stage2: round > 1 ? null : lastMsg.stage2,
+                  stage3: round > 1 ? null : lastMsg.stage3,
+                  loading: {
+                    ...lastMsg.loading,
+                    stage1: false,
+                    stage2: false,
+                    stage3: false,
+                  },
+                  timers: {
+                    ...lastMsg.timers,
+                    stage1Start: round > 1 ? null : lastMsg.timers?.stage1Start,
+                    stage1End: round > 1 ? null : lastMsg.timers?.stage1End,
+                    stage2Start: round > 1 ? null : lastMsg.timers?.stage2Start,
+                    stage2End: round > 1 ? null : lastMsg.timers?.stage2End,
+                    stage3Start: round > 1 ? null : lastMsg.timers?.stage3Start,
+                    stage3End: round > 1 ? null : lastMsg.timers?.stage3End,
+                  },
+                  metadata: {
+                    ...lastMsg.metadata,
+                    current_round: round,
+                    debate_rounds_configured: event.total_rounds,
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'round_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                
+                const currentRoundData = {
+                  round_number: event.round,
+                  stage1: lastMsg.stage1,
+                  stage2: lastMsg.stage2,
+                  stage3: lastMsg.stage3,
+                  metadata: {
+                    label_to_model: lastMsg.metadata?.label_to_model,
+                    aggregate_rankings: lastMsg.metadata?.aggregate_rankings,
+                    canonical_claims: lastMsg.metadata?.canonical_claims,
+                    aggregate_claim_verdicts: lastMsg.metadata?.aggregate_claim_verdicts,
+                  }
+                };
+
+                const existingRounds = lastMsg.metadata?.rounds || [];
+                const updatedRounds = [...existingRounds];
+                const existingIdx = updatedRounds.findIndex(r => r.round_number === event.round);
+                if (existingIdx >= 0) {
+                  updatedRounds[existingIdx] = currentRoundData;
+                } else {
+                  updatedRounds.push(currentRoundData);
+                }
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  metadata: {
+                    ...lastMsg.metadata,
+                    rounds: updatedRounds,
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'convergence':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  metadata: {
+                    ...lastMsg.metadata,
+                    converged: true,
+                    convergence_message: event.message,
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'stage4_start':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  loading: {
+                    ...lastMsg.loading,
+                    stage4: true
+                  },
+                  timers: {
+                    ...lastMsg.timers,
+                    stage4Start: Date.now()
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'stage4_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  loading: {
+                    ...lastMsg.loading,
+                    stage4: false
+                  },
+                  timers: {
+                    ...lastMsg.timers,
+                    stage4End: Date.now()
+                  },
+                  metadata: {
+                    ...lastMsg.metadata,
+                    stage4: event.data
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'debate_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const rounds = event.rounds || [];
+                const lastRound = rounds[rounds.length - 1] || {};
+
+                const updatedLastMsg = {
+                  ...lastMsg,
+                  stage1: lastRound.stage1 || lastMsg.stage1,
+                  stage2: lastRound.stage2 || lastMsg.stage2,
+                  stage3: lastRound.stage3 || lastMsg.stage3,
+                  metadata: {
+                    ...lastMsg.metadata,
+                    rounds: rounds,
+                    stage4: event.stage4 || lastMsg.metadata?.stage4,
+                    converged: event.converged || lastMsg.metadata?.converged,
+                    critique_mode: event.critique_mode || lastMsg.metadata?.critique_mode,
+                    label_to_model: lastRound.metadata?.label_to_model || lastMsg.metadata?.label_to_model,
+                    aggregate_rankings: lastRound.metadata?.aggregate_rankings || lastMsg.metadata?.aggregate_rankings,
+                    canonical_claims: lastRound.metadata?.canonical_claims || lastMsg.metadata?.canonical_claims,
+                    aggregate_claim_verdicts: lastRound.metadata?.aggregate_claim_verdicts || lastMsg.metadata?.aggregate_claim_verdicts,
+                  }
+                };
+
+                messages[messages.length - 1] = updatedLastMsg;
+                return { ...prev, messages };
+              });
               break;
 
             case 'title_complete':
