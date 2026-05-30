@@ -5,6 +5,7 @@ import ProviderSettings from './settings/ProviderSettings';
 import CouncilConfig from './settings/CouncilConfig';
 import SearchSettings from './settings/SearchSettings';
 import PromptSettings from './settings/PromptSettings';
+import DebateSettings from './settings/DebateSettings';
 import './Settings.css';
 
 const PROMPT_FIELDS = [
@@ -1563,6 +1564,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               Council Config
             </button>
             <button
+              className={`sidebar-nav-item ${activeSection === 'debate' ? 'active' : ''}`}
+              onClick={() => setActiveSection('debate')}
+            >
+              Debate Config
+            </button>
+            <button
               className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
               onClick={() => setActiveSection('prompts')}
             >
@@ -1688,6 +1695,21 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 // Validation
                 validationErrors={validationErrors}
                 chairmanSelectRef={chairmanSelectRef}
+              />
+            )}
+
+            {/* DEBATE CONFIGURATION */}
+            {activeSection === 'debate' && (
+              <DebateSettings
+                critiqueMode={critiqueMode}
+                setCritiqueMode={setCritiqueMode}
+                debateRounds={debateRounds}
+                setDebateRounds={setDebateRounds}
+                autoConverge={autoConverge}
+                setAutoConverge={setAutoConverge}
+                convergenceThreshold={convergenceThreshold}
+                setConvergenceThreshold={setConvergenceThreshold}
+                executionMode={settings?.execution_mode || 'full'}
               />
             )}
 
