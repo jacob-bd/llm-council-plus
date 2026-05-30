@@ -217,6 +217,10 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
+    # If this is the very first message in a reused empty draft, reset the creation date to now
+    if len(conversation["messages"]) == 0:
+        conversation["created_at"] = datetime.utcnow().isoformat()
+
     conversation["messages"].append({
         "role": "user",
         "content": content
