@@ -12,6 +12,7 @@ const PROMPT_FIELDS = [
   'stage1_prompt',
   'stage2_prompt',
   'stage3_prompt',
+  'stage4_prompt',
   'title_prompt',
   'query_prompt',
   'advisor_round1_prompt',
@@ -209,6 +210,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       // Prompts
       if (PROMPT_FIELDS.some(key => prompts[key] !== settings[key])) return true;
 
+      // Debate Settings
+      if (critiqueMode !== (settings.critique_mode || 'freeform')) return true;
+      if (debateRounds !== (settings.debate_rounds || 1)) return true;
+      if (autoConverge !== (settings.auto_converge !== undefined ? settings.auto_converge : true)) return true;
+      if (convergenceThreshold !== (settings.convergence_threshold || 2)) return true;
+
       // Note: API keys are auto-saved on test, so we don't check them here
 
       return false;
@@ -232,7 +239,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     stage2Temperature,
     councilMemberFilters,
     chairmanFilter,
-    prompts
+    prompts,
+    critiqueMode,
+    debateRounds,
+    autoConverge,
+    convergenceThreshold,
   ]);
 
   // Helper to determine if filters need to switch based on availability
@@ -1567,7 +1578,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               className={`sidebar-nav-item ${activeSection === 'debate' ? 'active' : ''}`}
               onClick={() => setActiveSection('debate')}
             >
-              Debate Config
+              Council Debate Config
             </button>
             <button
               className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
