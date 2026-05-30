@@ -211,31 +211,33 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
                         <div className="aggregate-title-group">
                             <h4>🏆 Stage 2 Results</h4>
                             <p className="stage-description">
-                                {viewMode === 'leaderboard' 
+                                {viewMode === 'leaderboard' || aggregateRankings.length < 3
                                     ? 'Combined results across all peer evaluations. Bar length corresponds to average rank value.'
                                     : 'Detailed matrix of anonymous peer evaluations.'
                                 }
                             </p>
                         </div>
-                        <div className="view-mode-toggle">
-                            <button 
-                                className={`toggle-btn ${viewMode === 'leaderboard' ? 'active' : ''}`}
-                                onClick={() => setViewMode('leaderboard')}
-                                title="Show Leaderboard List"
-                            >
-                                🏆 Leaderboard
-                            </button>
-                            <button 
-                                className={`toggle-btn ${viewMode === 'heatmap' ? 'active' : ''}`}
-                                onClick={() => setViewMode('heatmap')}
-                                title="Show Detailed Matrix"
-                            >
-                                📊 Detail Matrix
-                            </button>
-                        </div>
+                        {aggregateRankings.length >= 3 && (
+                            <div className="view-mode-toggle">
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'leaderboard' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('leaderboard')}
+                                    title="Show Leaderboard List"
+                                >
+                                    🏆 Leaderboard
+                                </button>
+                                <button 
+                                    className={`toggle-btn ${viewMode === 'heatmap' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('heatmap')}
+                                    title="Show Detailed Matrix"
+                                >
+                                    📊 Detail Matrix
+                                </button>
+                            </div>
+                        )}
                     </div>
 
-                    {viewMode === 'leaderboard' ? (
+                    {viewMode === 'leaderboard' || aggregateRankings.length < 3 ? (
                         <div className="aggregate-list animate-fade-in">
                             {aggregateRankings.map((agg, index) => {
                                 const visuals = getModelVisuals(agg.model);
