@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Skeleton from './common/Skeleton';
 import MarkdownContent from './MarkdownContent';
 import { getModelVisuals, getShortModelName } from '../utils/modelHelpers';
+import RankingHeatmap from './RankingHeatmap';
 import './Stage2.css';
 import StageTimer from './StageTimer';
 
@@ -25,6 +26,7 @@ function hexToRgb(hex) {
 
 export default function Stage2({ rankings, labelToModel, aggregateRankings, startTime, endTime }) {
     const [activeTab, setActiveTab] = useState(0);
+    const [viewMode, setViewMode] = useState('leaderboard'); // 'leaderboard' or 'heatmap'
 
     // Reset activeTab if it becomes out of bounds (e.g., during streaming)
     useEffect(() => {
@@ -205,53 +207,81 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, star
 
             {aggregateRankings && aggregateRankings.length > 0 && (
                 <div className="aggregate-rankings">
-                    <h4>🏆 Visual Leaderboard</h4>
-                    <p className="stage-description">
-                        Combined results across all peer evaluations. Bar length corresponds to average rank value.
-                    </p>
-                    <div className="aggregate-list">
-                        {aggregateRankings.map((agg, index) => {
-                            const visuals = getModelVisuals(agg.model);
-                            const shortName = getShortModelName(agg.model);
+                    <div className="aggregate-header-row">
+                        <div className="aggregate-title-group">
+                            <h4>🏆 Stage 2 Results</h4>
+                            <p className="stage-description">
+                                {viewMode === 'leaderboard' 
+                                    ? 'Combined results across all peer evaluations. Bar length corresponds to average rank value.'
+                                    : 'Detailed matrix of anonymous peer evaluations.'
+                                }
+                            </p>
+                        </div>
+                        <div className="view-mode-toggle">
+                            <button 
+                                className={`toggle-btn ${viewMode === 'leaderboard' ? 'active' : ''}`}
+                                onClick={() => setViewMode('leaderboard')}
+                                title="Show Leaderboard List"
+                            >
+                                🏆 Leaderboard
+                            </button>
+                            <button 
+                                className={`toggle-btn ${viewMode === 'heatmap' ? 'active' : ''}`}
+                                onClick={() => setViewMode('heatmap')}
+                                title="Show Detailed Matrix"
+                            >
+                                📊 Detail Matrix
+                            </button>
+                        </div>
+                    </div>
 
-                            // Calculate bar width proportional to the rank value
-                            // Higher rank = longer bar (matches the number visually)
-                            const maxRank = aggregateRankings.length;
-                            const scorePercent = Math.max(5, Math.min(100, (agg.average_rank / maxRank) * 100));
+                    {viewMode === 'leaderboard' ? (
+                        <div className="aggregate-list animate-fade-in">
+                            {aggregateRankings.map((agg, index) => {
+                                const visuals = getModelVisuals(agg.model);
+                                const shortName = getShortModelName(agg.model);
 
-                            return (
-                                <div key={index} className="aggregate-item">
-                                    <span className="rank-position">#{index + 1}</span>
+                                // Calculate bar width proportional to the rank value
+                                // Higher rank = longer bar (matches the number visually)
+                                const maxRank = aggregateRankings.length;
+                                const scorePercent = Math.max(5, Math.min(100, (agg.average_rank / maxRank) * 100));
 
-                                    <div className="rank-bar-container">
-                                        <div
-                                            className="rank-bar-fill"
-                                            style={{
-                                                width: `${scorePercent}%`,
-                                                '--bar-color-rgb': hexToRgb(visuals.color)
-                                            }}
-                                        >
-                                            <div className="rank-content">
-                                                <div className="rank-model-info">
-                                                    <span className="mini-avatar" style={{ backgroundColor: visuals.color }}>
-                                                        {visuals.icon}
-                                                    </span>
-                                                    <span className="rank-model-name">{shortName}</span>
-                                                </div>
+                                return (
+                                    <div key={index} className="aggregate-item">
+                                        <span className="rank-position">#{index + 1}</span>
 
-                                                <div className="rank-stats">
-                                                    <span className="rank-score">
-                                                        {agg.average_rank.toFixed(2)}
-                                                    </span>
-                                                    {index === 0 && <span className="trophy-icon">🏆</span>}
+                                        <div className="rank-bar-container">
+                                            <div
+                                                className="rank-bar-fill"
+                                                style={{
+                                                    width: `${scorePercent}%`,
+                                                    '--bar-color-rgb': hexToRgb(visuals.color)
+                                                }}
+                                            >
+                                                <div className="rank-content">
+                                                    <div className="rank-model-info">
+                                                        <span className="mini-avatar" style={{ backgroundColor: visuals.color }}>
+                                                            {visuals.icon}
+                                                        </span>
+                                                        <span className="rank-model-name">{shortName}</span>
+                                                    </div>
+
+                                                    <div className="rank-stats">
+                                                        <span className="rank-score">
+                                                            {agg.average_rank.toFixed(2)}
+                                                        </span>
+                                                        {index === 0 && <span className="trophy-icon">🏆</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <RankingHeatmap rankings={rankings} labelToModel={labelToModel} />
+                    )}
                 </div>
             )}
         </div>

@@ -26,18 +26,85 @@
 /* Aggregate Rankings Card */
 .aggregate-rankings {
   background: rgba(251, 146, 60, 0.08); /* Amber tint */
-  padding: 16px;
+  padding: 20px;
   border-radius: 12px;
   margin-bottom: 20px;
   border: 1px solid rgba(251, 146, 60, 0.2);
   backdrop-filter: blur(8px);
 }
 
+.aggregate-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 16px;
+}
+
+.aggregate-title-group {
+  flex: 1;
+  min-width: 250px;
+}
+
 .aggregate-rankings h4 {
-  margin: 0 0 12px 0;
+  margin: 0 0 6px 0;
   color: var(--accent-stage2);
-  font-size: 15px;
+  font-size: 16px;
   font-family: var(--font-ui);
+}
+
+.view-mode-toggle {
+  display: flex;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.view-mode-toggle .toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-mode-toggle .toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.view-mode-toggle .toggle-btn.active {
+  color: #ffffff;
+  background: var(--accent-stage2);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.3);
+}
+
+/* Smooth fade-in animation for list */
+.animate-fade-in {
+  animation: fadeInList 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInList {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .aggregate-list {

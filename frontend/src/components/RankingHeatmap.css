@@ -1,0 +1,235 @@
+/* Ranking Heatmap - Midnight Glass Style */
+
+.ranking-heatmap {
+  margin-top: 16px;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.heatmap-header {
+  margin-bottom: 20px;
+}
+
+.heatmap-title {
+  margin: 0 0 6px 0 !important;
+  color: var(--accent-stage2);
+  font-size: 16px !important;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  letter-spacing: -0.01em;
+}
+
+.heatmap-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.heatmap-table-wrapper {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(30, 41, 59, 0.2);
+  /* Elegant horizontal scroll bar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.heatmap-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.heatmap-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.heatmap-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.heatmap-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  font-family: var(--font-ui);
+}
+
+.heatmap-corner {
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.heatmap-col-header {
+  background: rgba(15, 23, 42, 0.5);
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.heatmap-row-header {
+  background: rgba(15, 23, 42, 0.5);
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.heatmap-cell {
+  text-align: center;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+  font-size: 13px;
+  min-width: 90px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.heatmap-row:hover .heatmap-row-header {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.heatmap-row:hover .heatmap-cell {
+  background-color: rgba(255, 255, 255, 0.01);
+}
+
+/* Header contents styling */
+.header-cell-content,
+.row-cell-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-cell-content {
+  justify-content: center;
+}
+
+.col-name-text,
+.row-name-text {
+  font-family: var(--font-ui);
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600 !important;
+}
+
+/* Rank Badge styling inside cells */
+.rank-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+}
+
+/* 1st place — gorgeous premium emerald */
+.heatmap-pos-1 .rank-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+}
+
+/* 2nd place — sleek soft amber */
+.heatmap-pos-2 .rank-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
+}
+
+/* 3rd place — rich modern crimson */
+.heatmap-pos-3 .rank-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* 4th+ place — deep violet/ruby */
+.heatmap-pos-4 .rank-badge,
+.heatmap-pos-5 .rank-badge,
+.heatmap-pos-6 .rank-badge {
+  background: rgba(225, 29, 72, 0.12);
+  color: #fda4af;
+  border-color: rgba(225, 29, 72, 0.2);
+}
+
+/* Self-ranking cell styling */
+.heatmap-self {
+  color: rgba(255, 255, 255, 0.15);
+  font-weight: 400;
+  font-family: var(--font-code);
+  background: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Unknown rankings fallback */
+.heatmap-unknown {
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 400;
+}
+
+/* Average rank row styling */
+.heatmap-avg-row {
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.heatmap-avg-row .heatmap-row-header {
+  background: rgba(15, 23, 42, 0.7);
+  color: var(--accent-stage2);
+}
+
+.heatmap-avg {
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: var(--accent-primary);
+  font-family: var(--font-code);
+  font-weight: 700;
+  font-size: 14px;
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Hover cell expansion and glows */
+.heatmap-cell:hover:not(.heatmap-self):not(.heatmap-unknown):not(.heatmap-avg) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
