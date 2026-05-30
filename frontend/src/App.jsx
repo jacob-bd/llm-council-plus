@@ -250,7 +250,7 @@ function App() {
 
   // Load conversation details when selected
   useEffect(() => {
-    if (currentConversationId) {
+    if (currentConversationId && currentConversationId !== 'draft') {
       if (skipLoadForIdRef.current === currentConversationId) {
         skipLoadForIdRef.current = null;
         return;
@@ -305,31 +305,14 @@ function App() {
     setIsLoading(false);
     setAppMode('council');
 
-    // Reuse an empty council conversation only (not advisor drafts)
-    const existingEmpty = conversations.find(
-      (conv) =>
-        conv.mode !== 'advisors'
-        && (!conv.title || conv.title === 'New Conversation')
-        && conv.message_count === 0
-    );
-
-    if (existingEmpty) {
-      setCurrentConversation(null);
-      setCurrentConversationId(existingEmpty.id);
-      return;
-    }
-
-    try {
-      const newConv = await api.createConversation({ mode: 'council' });
-      setConversations([
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0, mode: 'council' },
-        ...conversations,
-      ]);
-      setCurrentConversation(null);
-      setCurrentConversationId(newConv.id);
-    } catch (error) {
-      console.error('Failed to create conversation:', error);
-    }
+    // Reset current states to indicate we are in a fresh Client-Side Draft
+    setCurrentConversationId('draft');
+    setCurrentConversation({
+      id: 'draft',
+      mode: 'council',
+      title: 'New Conversation',
+      messages: []
+    });
   };
 
   const handleSelectConversation = (id) => {
@@ -368,30 +351,36 @@ function App() {
   };
 
   const handleStartDebate = async (options) => {
+    // Assign unique ID to this request to prevent race conditions
+    const currentRequestId = ++requestIdRef.current;
+
+    setIsLoading(true);
+    let activeConversationId = currentConversationId;
+
     try {
-      // Clean up any existing empty conversation before creating a new one
-      const existingEmpty = conversations.find(conv => (!conv.title || conv.title === 'New Conversation') && conv.message_count === 0);
-      if (existingEmpty) {
+      // Lazily create the conversation if it is a Client-Side Draft
+      if (activeConversationId === 'draft' || !activeConversationId) {
         try {
-          await api.deleteConversation(existingEmpty.id);
-          setConversations(prev => prev.filter(c => c.id !== existingEmpty.id));
-        } catch (e) {
-          console.error("Failed to cleanup empty conversation", e);
+          const newConv = await api.createConversation({ mode: 'advisors' });
+          activeConversationId = newConv.id;
+          
+          // Pre-populate index states so it appears immediately in the sidebar list
+          setConversations((prev) => [
+            { id: newConv.id, created_at: newConv.created_at, message_count: 0, mode: 'advisors', title: 'New Conversation' },
+            ...prev,
+          ]);
+          
+          // Update draft references safely
+          conversationVersionRef.current++;
+          skipLoadForIdRef.current = newConv.id;
+          setCurrentConversationId(newConv.id);
+        } catch (createErr) {
+          console.error('Lazy creation of conversation failed:', createErr);
+          setIsLoading(false);
+          return;
         }
       }
 
-      const newConv = await api.createConversation({ mode: 'advisors' });
-      const convId = newConv.id;
-
-      setConversations((prev) => [
-        { id: convId, created_at: newConv.created_at, message_count: 0, mode: 'advisors', title: 'New Conversation' },
-        ...prev,
-      ]);
-      // Bump version so any in-flight or upcoming loadConversation calls
-      // from the useEffect won't overwrite our optimistic state.
-      conversationVersionRef.current++;
-      skipLoadForIdRef.current = convId;
-      setCurrentConversationId(convId);
       setAppMode('advisors');
 
       const userMessage = { role: 'user', content: options.question };
@@ -413,15 +402,14 @@ function App() {
       };
 
       setCurrentConversation({
-        id: convId,
+        id: activeConversationId,
         messages: [userMessage, debateMessage],
       });
 
       advisorAbortControllerRef.current = new AbortController();
-      setIsLoading(true);
 
       await api.sendDebateStream(
-        convId,
+        activeConversationId,
         options,
         (eventType, event) => {
           switch (eventType) {
@@ -591,11 +579,37 @@ function App() {
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
+    let activeConversationId = currentConversationId;
+
     try {
+      // Lazily create the conversation if it is a Client-Side Draft
+      if (activeConversationId === 'draft') {
+        try {
+          const newConv = await api.createConversation({ mode: 'council' });
+          activeConversationId = newConv.id;
+          
+          // Pre-populate index states so it appears immediately in the sidebar list
+          setConversations((prev) => [
+            { id: newConv.id, created_at: newConv.created_at, message_count: 0, mode: 'council', title: 'New Conversation' },
+            ...prev,
+          ]);
+          
+          // Update draft references safely
+          conversationVersionRef.current++;
+          skipLoadForIdRef.current = newConv.id;
+          setCurrentConversationId(newConv.id);
+        } catch (createErr) {
+          console.error('Lazy creation of conversation failed:', createErr);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
       setCurrentConversation((prev) => ({
         ...prev,
+        id: activeConversationId, // transition draft ID to actual database UUID
         messages: [...prev.messages, userMessage],
       }));
 
@@ -634,7 +648,7 @@ function App() {
 
       // Send message with streaming
       await api.sendMessageStream(
-        currentConversationId,
+        activeConversationId,
         {
           content,
           searchProvider,
@@ -1031,8 +1045,20 @@ function App() {
   const resetAppState = (mode) => {
     abortAllStreams();
     setIsLoading(false);
-    setCurrentConversationId(null);
-    setCurrentConversation(null);
+    
+    if (mode === 'advisors') {
+      setCurrentConversationId('draft');
+      setCurrentConversation({
+        id: 'draft',
+        mode: 'advisors',
+        title: 'New Conversation',
+        messages: []
+      });
+    } else {
+      setCurrentConversationId(null);
+      setCurrentConversation(null);
+    }
+    
     setAppMode(mode);
     setSidebarOpen(false);
   };
