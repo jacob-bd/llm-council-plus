@@ -139,22 +139,34 @@ def register(server, base_url: str) -> None:
         "and 'claim' (per-claim with canonical claim extraction). "
         "Returns all rounds data plus the chairman's corrected draft (Stage 4). "
         "Set debate_rounds (1-5, default from settings) for number of rounds. "
-        "Auto-convergence stops early if rankings stabilize."
+        "auto_converge (bool) stops early if rankings stabilize; "
+        "convergence_threshold (1-3) sets how many stable rounds trigger early stop."
     ))
     async def run_iterative_debate(
         query: str,
         debate_rounds: int | None = None,
         critique_mode: str | None = None,
+        auto_converge: bool | None = None,
+        convergence_threshold: int | None = None,
         web_search: bool = False,
         models: list[str] | None = None,
     ) -> str:
         try:
             async with CouncilClient(base_url) as client:
+                settings_patch = {}
                 if critique_mode:
                     critique_mode = critique_mode.strip().lower()
                     if critique_mode not in ("freeform", "paragraph", "claim"):
                         return "Error: critique_mode must be freeform, paragraph, or claim."
-                    await client.update_settings(critique_mode=critique_mode)
+                    settings_patch["critique_mode"] = critique_mode
+                if auto_converge is not None:
+                    settings_patch["auto_converge"] = auto_converge
+                if convergence_threshold is not None:
+                    if not (1 <= convergence_threshold <= 3):
+                        return "Error: convergence_threshold must be 1, 2, or 3."
+                    settings_patch["convergence_threshold"] = convergence_threshold
+                if settings_patch:
+                    await client.update_settings(**settings_patch)
 
                 conv = await client.create_conversation()
                 conversation_id = conv["id"]

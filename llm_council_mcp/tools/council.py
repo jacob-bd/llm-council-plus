@@ -39,6 +39,8 @@ def register(server, base_url: str) -> None:
         is_default: bool = False,
         critique_mode: str | None = None,
         debate_rounds: int | None = None,
+        auto_converge: bool | None = None,
+        convergence_threshold: int | None = None,
     ) -> str:
         action = action.strip().lower()
         valid = ("get", "update", "list_presets", "save_preset", "delete_preset", "set_default_preset")
@@ -133,6 +135,12 @@ def register(server, base_url: str) -> None:
                     if not (1 <= debate_rounds <= 5):
                         return "Error: debate_rounds must be between 1 and 5."
                     updates["debate_rounds"] = debate_rounds
+                if auto_converge is not None:
+                    updates["auto_converge"] = auto_converge
+                if convergence_threshold is not None:
+                    if not (1 <= convergence_threshold <= 3):
+                        return "Error: convergence_threshold must be 1, 2, or 3."
+                    updates["convergence_threshold"] = convergence_threshold
 
                 if not updates:
                     return "Error: no update fields provided."
