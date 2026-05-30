@@ -550,6 +550,7 @@ function CouncilMessageRenderer({
                 {displayStage3 && (
                     <Stage3
                         finalResponse={displayStage3}
+                        labelToModel={displayMetadata.label_to_model}
                         startTime={msg.timers?.stage3Start}
                         endTime={msg.timers?.stage3End}
                     />

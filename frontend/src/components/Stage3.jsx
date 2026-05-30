@@ -5,7 +5,19 @@ import ThinkBlockRenderer from './ThinkBlockRenderer';
 import StageTimer from './StageTimer';
 import './Stage3.css';
 
-export default function Stage3({ finalResponse, startTime, endTime }) {
+function deAnonymizeText(text, labelToModel) {
+    if (!labelToModel) return text;
+
+    let result = text;
+    // Replace each "Response X" with the actual model name
+    Object.entries(labelToModel).forEach(([label, model]) => {
+        const modelShortName = getShortModelName(model);
+        result = result.replace(new RegExp(label, 'g'), `**${modelShortName}**`);
+    });
+    return result;
+}
+
+export default function Stage3({ finalResponse, labelToModel, startTime, endTime }) {
     const [isCopied, setIsCopied] = useState(false);
 
     if (!finalResponse) {
@@ -30,6 +42,15 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
             console.error('Failed to copy text:', err);
         }
     };
+
+    const displayContent = typeof finalResponse?.response === 'string'
+        ? finalResponse.response
+        : String(finalResponse?.response || 'No response');
+
+    // De-anonymize names for user viewing
+    const deAnonymizedContent = labelToModel
+        ? deAnonymizeText(displayContent, labelToModel)
+        : displayContent;
 
     return (
         <div className="stage-container stage-3">
@@ -75,11 +96,7 @@ export default function Stage3({ finalResponse, startTime, endTime }) {
                 </div>
                 <div className="final-text markdown-content">
                     <ThinkBlockRenderer
-                        content={
-                            typeof finalResponse?.response === 'string'
-                                ? finalResponse.response
-                                : String(finalResponse?.response || 'No response')
-                        }
+                        content={deAnonymizedContent}
                     />
                 </div>
             </div>
