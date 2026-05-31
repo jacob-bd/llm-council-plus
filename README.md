@@ -1,5 +1,20 @@
 # LLM Council Plus
 
+> [!CAUTION]
+> ## This repository has been deprecated.
+>
+> **LLM Council Plus has been rebranded and moved to a new home:**
+>
+> ### **[The AI Counsel](https://github.com/jacob-bd/the-ai-counsel)**
+>
+> **No further updates, bug fixes, or pull requests will be merged here.**
+>
+> Everyone is encouraged to migrate to the new repository. It includes a full **[Migration Guide](https://github.com/jacob-bd/the-ai-counsel/blob/main/docs/MIGRATION.md)** with step-by-step instructions for Docker, local dev, MCP server, and skill symlink upgrades. Your existing data and configs carry over without any changes.
+>
+> **v0.7.0 is the final release on this repository.**
+
+---
+
 > **Collective AI Intelligence** — Convene a council of AI models that deliberate, peer-review, and synthesize the best answer — or assemble a panel of named advisor personas that debate your question and deliver a structured verdict.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)

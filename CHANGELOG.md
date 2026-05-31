@@ -1,11 +1,14 @@
 # Changelog
 
+> [!IMPORTANT]
+> **This project has moved and been rebranded to [The AI Counsel](https://github.com/jacob-bd/the-ai-counsel).** All future development continues there. This changelog will no longer be updated.
+
 All notable changes to LLM Council Plus will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-05-30
+## [0.7.0] - 2026-05-30 (Final Release)
 
 ### Added
 
