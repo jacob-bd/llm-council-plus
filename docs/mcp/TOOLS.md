@@ -1,8 +1,8 @@
 # MCP Tools Reference
 
-The LLM Council Plus MCP server exposes **9 action-based tools**. Each tool groups related operations behind an `action` parameter. Your AI assistant picks the tool and action from what you ask — you rarely need to name them directly.
+The LLM Council Plus MCP server exposes **10 action-based tools**. Each tool groups related operations behind an `action` parameter. Your AI assistant picks the tool and action from what you ask — you rarely need to name them directly.
 
-**Breaking change (v0.5.2):** The previous 25 single-purpose tools were replaced by these 9. Old tool names (`run_deliberation`, `get_council_config`, `check_health`, etc.) no longer exist.
+**Breaking change (v0.5.2):** The previous 25 single-purpose tools were replaced by 9 consolidated tools. Old tool names (`run_deliberation`, `get_council_config`, `check_health`, etc.) no longer exist. **v0.7.0** added `run_iterative_debate` as the 10th tool.
 
 ---
 
@@ -13,6 +13,7 @@ The LLM Council Plus MCP server exposes **9 action-based tools**. Each tool grou
 | [`council_deliberate`](#council_deliberate) | `stage1`, `stage2`, `stage3`, `full` | Run council deliberation stages |
 | [`model_chat`](#model_chat) | `quick`, `multi_turn` | Single-model chat (stateless or threaded) |
 | [`advisor_debate`](#advisor_debate) | _(none — direct params)_ | Multi-round persona debate |
+| [`run_iterative_debate`](#run_iterative_debate) | _(none — direct params)_ | Multi-round council debate with critique modes |
 | [`council_settings`](#council_settings) | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | Council config + presets |
 | [`advisor_settings`](#advisor_settings) | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | Advisor defaults + presets |
 | [`personas`](#personas) | `list`, `get`, `update`, `reset` | Advisor persona CRUD |
@@ -106,6 +107,44 @@ Run a multi-round advisor debate with named personas.
 
 ---
 
+## run_iterative_debate
+
+Run a multi-round iterative debate with convergence detection. Models debate across rounds, refining answers based on peer feedback. Returns all rounds data plus the chairman's corrected draft (Stage 4).
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The question or topic to debate |
+| `debate_rounds` | integer | No | 1–5 (default from settings) |
+| `critique_mode` | string | No | `freeform` (default), `paragraph`, or `claim` |
+| `auto_converge` | boolean | No | Stop early if rankings stabilize (default `true`) |
+| `convergence_threshold` | integer | No | 1–3, consecutive stable rounds to trigger early stop (default `2`) |
+| `web_search` | boolean | No | Enrich query with web search (default `false`) |
+| `models` | string[] | No | Override council members for the debate |
+
+**Example:**
+```json
+{
+  "query": "What are the tradeoffs between REST and GraphQL?",
+  "debate_rounds": 2,
+  "critique_mode": "freeform",
+  "web_search": true
+}
+```
+
+**Response shape (abbreviated):**
+```json
+{
+  "conversation_id": "uuid",
+  "total_rounds_executed": 2,
+  "converged": false,
+  "critique_mode": "freeform",
+  "rounds": [...],
+  "stage4": {"model": "...", "response": "Chairman's corrected draft..."}
+}
+```
+
+---
+
 ## council_settings
 
 Manage council configuration and presets.
@@ -187,10 +226,10 @@ Valid IDs: `skeptic`, `pragmatist`, `innovator`, `historian`, `ethicist`, `analy
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `action` | string | Yes | `list` or `get` |
-| `conversation_id` | string | For `get` | Conversation UUID |
+| `action` | string | Yes | `list`, `get`, or `progress` |
+| `conversation_id` | string | For `get`/`progress` | Conversation UUID |
 
-`list` returns human-readable text. `get` returns JSON summary with truncated user content and chairman synthesis excerpts.
+`list` returns human-readable text. `get` returns JSON summary with truncated user content and chairman synthesis excerpts. `progress` returns live progress of an active streaming run — `{active: true, stage, progress, stage1, stage2, stage3, stage4}` or `{active: false}` if idle.
 
 ---
 

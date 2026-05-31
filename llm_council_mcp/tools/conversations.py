@@ -11,16 +11,17 @@ def register(server, base_url: str) -> None:
     """Register conversations tool."""
 
     @server.tool(description=(
-        "Manage saved conversations. action: 'list' (titles and IDs) or "
-        "'get' (full summary by conversation_id)."
+        "Manage saved conversations. action: 'list' (titles and IDs), "
+        "'get' (full summary by conversation_id), or "
+        "'progress' (live progress of an active streaming run by conversation_id)."
     ))
     async def conversations(
         action: str,
         conversation_id: str | None = None,
     ) -> str:
         action = action.strip().lower()
-        if action not in ("list", "get"):
-            return "Error: action must be list or get."
+        if action not in ("list", "get", "progress"):
+            return "Error: action must be list, get, or progress."
 
         try:
             async with CouncilClient(base_url) as client:
@@ -36,6 +37,12 @@ def register(server, base_url: str) -> None:
                         created = conv.get("created_at", "")[:10]
                         lines.append(f"  • [{conv_id}] {title} — {count} message(s), created {created}")
                     return "\n".join(lines)
+
+                if action == "progress":
+                    if not conversation_id:
+                        return "Error: conversation_id is required for progress."
+                    progress = await client.get_conversation_progress(conversation_id)
+                    return json.dumps(progress, indent=2)
 
                 if not conversation_id:
                     return "Error: conversation_id is required for get."

@@ -594,6 +594,32 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     }
   };
 
+  const resetCustomEndpointLocalState = () => {
+    setCustomEndpointName('');
+    setCustomEndpointUrl('');
+    setCustomEndpointApiKey('');
+    setCustomEndpointModels([]);
+    setCustomEndpointTestResult(null);
+  };
+
+  const handleClearCustomEndpoint = async () => {
+    try {
+      await api.updateSettings({
+        custom_endpoint_name: '',
+        custom_endpoint_url: '',
+        custom_endpoint_api_key: '',
+        enabled_providers: { ...enabledProviders, custom: false },
+      });
+      resetCustomEndpointLocalState();
+      setEnabledProviders(prev => ({ ...prev, custom: false }));
+      await loadSettings();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setError('Failed to disconnect custom endpoint');
+    }
+  };
+
   const handleTestSerper = async () => {
     if (!serperApiKey && !settings.serper_api_key_set) {
       setSerperTestResult({ success: false, message: 'Please enter an API key first' });
@@ -1060,8 +1086,10 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         openrouter: false,
         ollama: false,
         groq: false,
-        direct: false
+        direct: false,
+        custom: false
       });
+      resetCustomEndpointLocalState();
 
       setDirectProviderToggles({
         openai: false,
@@ -1110,8 +1138,12 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
           openrouter: false,
           ollama: false,
           groq: false,
-          direct: false
+          direct: false,
+          custom: false
         },
+        custom_endpoint_name: '',
+        custom_endpoint_url: '',
+        custom_endpoint_api_key: '',
         direct_provider_toggles: {
           openai: false,
           anthropic: false,
@@ -1653,6 +1685,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 isTestingCustomEndpoint={isTestingCustomEndpoint}
                 customEndpointTestResult={customEndpointTestResult}
                 customEndpointModels={customEndpointModels}
+                onClearCustomEndpoint={handleClearCustomEndpoint}
               />
             )}
 

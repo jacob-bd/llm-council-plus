@@ -25,6 +25,53 @@ from .debate import run_iterative_debate, MAX_DEBATE_ROUNDS
 
 logger = logging.getLogger(__name__)
 
+# In-memory registry of active streaming council/debate runs.
+# Key: conversation_id, Value: progress snapshot updated as stages complete.
+# NOTE: process-local — only valid for single-worker deployments.
+_active_runs: Dict[str, Dict[str, Any]] = {}
+
+
+def _register_run(conversation_id: str, execution_mode: str) -> None:
+    _active_runs[conversation_id] = {
+        "stage": "initializing",
+        "execution_mode": execution_mode,
+        "progress": {
+            "stage1": {"total": 0},
+            "stage2": {"total": 0},
+        },
+    }
+
+
+def _save_partial_results(
+    conversation_id: str,
+    body,
+    stage1_results: list,
+    stage2_results: list,
+    stage3_result,
+    conversation: dict,
+    label_to_model: Optional[dict] = None,
+    aggregate_rankings=None,
+    extra_metadata: Optional[dict] = None,
+) -> None:
+    partial_metadata: Dict[str, Any] = {
+        "execution_mode": body.execution_mode,
+        "incomplete": True,
+    }
+    if extra_metadata:
+        partial_metadata.update(extra_metadata)
+    if label_to_model:
+        partial_metadata["label_to_model"] = label_to_model
+    if aggregate_rankings:
+        partial_metadata["aggregate_rankings"] = aggregate_rankings
+    storage.add_assistant_message(
+        conversation_id,
+        stage1_results,
+        stage2_results if body.execution_mode in ["chat_ranking", "full"] and stage2_results else None,
+        stage3_result if body.execution_mode == "full" else None,
+        partial_metadata,
+        conversation=conversation,
+    )
+
 app = FastAPI(title="LLM Council Plus API")
 
 # Sensitive settings endpoints (export/import/reset) leak or wipe API keys, so
@@ -375,6 +422,29 @@ async def delete_conversation(conversation_id: str):
     return {"status": "deleted"}
 
 
+@app.get("/api/conversations/{conversation_id}/progress")
+async def get_conversation_progress(conversation_id: str):
+    """Return live progress for an active streaming run, or {active: false} if none."""
+    run = _active_runs.get(conversation_id)
+    if run is None:
+        return {"active": False}
+    s1 = run.get("stage1_responses") or []
+    s2 = run.get("stage2_responses") or []
+    return {
+        "active": True,
+        "stage": run["stage"],
+        "execution_mode": run["execution_mode"],
+        "progress": {
+            "stage1": {"count": len(s1), "total": run["progress"]["stage1"]["total"]},
+            "stage2": {"count": len(s2), "total": run["progress"]["stage2"]["total"]},
+        },
+        "stage1": s1 or None,
+        "stage2": s2 or None,
+        "stage3": run.get("stage3_response"),
+        "stage4": run.get("stage4_response"),
+    }
+
+
 @app.post("/api/conversations/{conversation_id}/message/stream")
 async def send_message_stream(conversation_id: str, body: SendMessageRequest, request: Request):
     """Send a message and stream the 3-stage council process."""
@@ -387,14 +457,14 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
     is_first_message = len(conversation["messages"]) == 0
 
     async def event_generator():
+        title_task = None
+        stage1_results = []
+        stage2_results = []
+        stage3_result = None
+        label_to_model = {}
+        aggregate_rankings = {}
+        _register_run(conversation_id, body.execution_mode)
         try:
-            # Initialize variables for metadata
-            stage1_results = []
-            stage2_results = []
-            stage3_result = None
-            label_to_model = {}
-            aggregate_rankings = {}
-            
             storage.add_user_message(conversation_id, body.content, conversation=conversation)
 
             preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
@@ -404,7 +474,6 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                 return
 
             # Start title generation in parallel (don't await yet)
-            title_task = None
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(body.content))
 
@@ -417,6 +486,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                 settings = get_settings()
                 provider = _apply_search_env(settings, body.search_provider)
 
+                _active_runs[conversation_id]["stage"] = "search"
                 yield f"data: {json.dumps({'type': 'search_start', 'data': {'provider': provider.value}})}\n\n"
 
                 if await request.is_disconnected():
@@ -447,19 +517,21 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                 await asyncio.sleep(0.05)
 
             # Stage 1: Collect responses
+            _active_runs[conversation_id]["stage"] = "stage1"
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
             await asyncio.sleep(0.05)
-            
+
             total_models = 0
-            
+
             async for item in stage1_collect_responses(body.content, search_context, request, models_override=body.council_models, history=history):
                 if isinstance(item, int):
                     total_models = item
-                    print(f"DEBUG: Sending stage1_init with total={total_models}")
+                    _active_runs[conversation_id]["progress"]["stage1"]["total"] = total_models
                     yield f"data: {json.dumps({'type': 'stage1_init', 'total': total_models})}\n\n"
                     continue
-                
+
                 stage1_results.append(item)
+                _active_runs[conversation_id]["stage1_responses"] = stage1_results
                 yield f"data: {json.dumps({'type': 'stage1_progress', 'data': item, 'count': len(stage1_results), 'total': total_models})}\n\n"
                 await asyncio.sleep(0.01)
 
@@ -475,23 +547,24 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
 
             # Stage 2: Only if mode is 'chat_ranking' or 'full'
             if body.execution_mode in ["chat_ranking", "full"]:
+                _active_runs[conversation_id]["stage"] = "stage2"
                 yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
                 await asyncio.sleep(0.05)
-                
+
                 # Iterate over the async generator
                 async for item in stage2_collect_rankings(body.content, stage1_results, search_context, request):
                     # First item is the label mapping
                     if isinstance(item, dict) and not item.get('model'):
                         label_to_model = item
+                        _active_runs[conversation_id]["progress"]["stage2"]["total"] = len(label_to_model)
                         # Send init event with total count
                         yield f"data: {json.dumps({'type': 'stage2_init', 'total': len(label_to_model)})}\n\n"
                         continue
-                    
+
                     # Subsequent items are results
                     stage2_results.append(item)
-                    
-                    # Send progress update
-                    print(f"Stage 2 Progress: {len(stage2_results)}/{len(label_to_model)} - {item['model']}")
+                    _active_runs[conversation_id]["stage2_responses"] = stage2_results
+
                     yield f"data: {json.dumps({'type': 'stage2_progress', 'data': item, 'count': len(stage2_results), 'total': len(label_to_model)})}\n\n"
                     await asyncio.sleep(0.01)
 
@@ -501,6 +574,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
 
             # Stage 3: Only if mode is 'full'
             if body.execution_mode == "full":
+                _active_runs[conversation_id]["stage"] = "stage3"
                 yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
                 await asyncio.sleep(0.05)
 
@@ -510,6 +584,7 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
                     raise asyncio.CancelledError("Client disconnected")
 
                 stage3_result = await stage3_synthesize_final(body.content, stage1_results, stage2_results, search_context, chairman_override=body.chairman_model)
+                _active_runs[conversation_id]["stage3_response"] = stage3_result
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
@@ -526,12 +601,12 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             metadata = {
                 "execution_mode": body.execution_mode,  # Save mode for historical context
             }
-            
+
             # Only include stage2/stage3 metadata if they were executed
             if body.execution_mode in ["chat_ranking", "full"]:
                 metadata["label_to_model"] = label_to_model
                 metadata["aggregate_rankings"] = aggregate_rankings
-            
+
             if search_context:
                 metadata["search_context"] = search_context
             if search_query:
@@ -551,10 +626,20 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
 
         except asyncio.CancelledError:
             print(f"Stream cancelled for conversation {conversation_id}")
+            if stage1_results:
+                try:
+                    _save_partial_results(
+                        conversation_id, body, stage1_results, stage2_results,
+                        stage3_result, conversation,
+                        label_to_model=label_to_model,
+                        aggregate_rankings=aggregate_rankings,
+                    )
+                    print(f"Saved partial results: {len(stage1_results)} stage1, {len(stage2_results)} stage2")
+                except Exception as save_err:
+                    print(f"Could not save partial results: {save_err}")
             # Even if cancelled, try to save the title if it's ready or nearly ready
             if title_task:
                 try:
-                    # Give it a small grace period to finish if it's close
                     title = await asyncio.wait_for(title_task, timeout=2.0)
                     storage.update_conversation_title(conversation_id, title)
                     print(f"Saved title despite cancellation: {title}")
@@ -567,6 +652,8 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             storage.add_error_message(conversation_id, f"Error: {str(e)}")
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            _active_runs.pop(conversation_id, None)
 
     return StreamingResponse(
         event_generator(),
@@ -589,20 +676,20 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
     is_first_message = len(conversation["messages"]) == 0
 
     async def event_generator():
+        title_task = None
+        rounds_data = []
+        final_stage1 = []
+        final_stage2 = []
+        final_stage3 = None
+        final_label_to_model = {}
+        final_aggregate_rankings = []
+        final_canonical_claims = None
+        final_aggregate_claim_verdicts = None
+        final_stage4 = None
+        debate_critique_mode = "freeform"
+        debate_converged = False
+        _register_run(conversation_id, body.execution_mode)
         try:
-            # Initialize variables
-            rounds_data = []
-            final_stage1 = []
-            final_stage2 = []
-            final_stage3 = None
-            final_label_to_model = {}
-            final_aggregate_rankings = []
-            final_canonical_claims = None
-            final_aggregate_claim_verdicts = None
-            final_stage4 = None
-            debate_critique_mode = "freeform"
-            debate_converged = False
-            
             storage.add_user_message(conversation_id, body.content, conversation=conversation)
 
             preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
@@ -612,7 +699,6 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
                 return
 
             # Start title generation in parallel
-            title_task = None
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(body.content))
 
@@ -666,6 +752,50 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
                 event_type = event.get("type")
                 yield f"data: {json.dumps(event)}\n\n"
                 await asyncio.sleep(0.01)
+
+                run_info = _active_runs[conversation_id]
+                if event_type == "search_start":
+                    run_info["stage"] = "search"
+                elif event_type == "stage1_start":
+                    run_info["stage"] = "stage1"
+                    run_info["progress"]["stage1"] = {"total": 0}
+                elif event_type == "stage1_init":
+                    run_info["progress"]["stage1"]["total"] = event.get("total", 0)
+                elif event_type in ["stage1_complete", "stage1_progress"]:
+                    stage1_data = event.get("data")
+                    if isinstance(stage1_data, list):
+                        run_info["stage1_responses"] = stage1_data
+                    elif isinstance(stage1_data, dict):
+                        responses = run_info.setdefault("stage1_responses", [])
+                        seen = run_info.setdefault("_seen_stage1", set())
+                        model_id = stage1_data.get("model")
+                        if model_id not in seen:
+                            seen.add(model_id)
+                            responses.append(stage1_data)
+                elif event_type == "stage2_start":
+                    run_info["stage"] = "stage2"
+                    run_info["progress"]["stage2"] = {"total": 0}
+                elif event_type == "stage2_init":
+                    run_info["progress"]["stage2"]["total"] = event.get("total", 0)
+                elif event_type in ["stage2_complete", "stage2_progress"]:
+                    stage2_data = event.get("data")
+                    if isinstance(stage2_data, list):
+                        run_info["stage2_responses"] = stage2_data
+                    elif isinstance(stage2_data, dict):
+                        responses = run_info.setdefault("stage2_responses", [])
+                        seen = run_info.setdefault("_seen_stage2", set())
+                        model_id = stage2_data.get("model")
+                        if model_id not in seen:
+                            seen.add(model_id)
+                            responses.append(stage2_data)
+                elif event_type == "stage3_start":
+                    run_info["stage"] = "stage3"
+                elif event_type == "stage3_complete":
+                    run_info["stage3_response"] = event.get("data")
+                elif event_type == "stage4_start":
+                    run_info["stage"] = "stage4"
+                elif event_type == "stage4_complete":
+                    run_info["stage4_response"] = event.get("data")
 
                 if event_type == "debate_complete":
                     rounds_data = event.get("rounds", [])
@@ -728,6 +858,17 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
 
         except asyncio.CancelledError:
             print(f"Stream cancelled for conversation {conversation_id}")
+            if final_stage1:
+                try:
+                    _save_partial_results(
+                        conversation_id, body, final_stage1, final_stage2,
+                        final_stage3, conversation,
+                        label_to_model=final_label_to_model,
+                        extra_metadata={"rounds": rounds_data},
+                    )
+                    print(f"Saved partial debate results: {len(rounds_data)} rounds")
+                except Exception as save_err:
+                    print(f"Could not save partial debate results: {save_err}")
             if title_task:
                 try:
                     title = await asyncio.wait_for(title_task, timeout=2.0)
@@ -739,6 +880,8 @@ async def send_debate_message_stream(conversation_id: str, body: SendMessageRequ
             print(f"Stream error: {e}")
             storage.add_error_message(conversation_id, f"Error: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            _active_runs.pop(conversation_id, None)
 
     return StreamingResponse(
         event_generator(),

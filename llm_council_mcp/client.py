@@ -143,6 +143,14 @@ class CouncilClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def get_conversation_progress(self, conversation_id: str) -> dict:
+        """Poll live progress of an active streaming run."""
+        resp = await self.client.get(
+            f"{self.base_url}/api/conversations/{conversation_id}/progress"
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     # ── One-Shot ───────────────────────────────────────────────────────────────
 
     async def ask(

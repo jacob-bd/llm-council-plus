@@ -8,12 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0] - 2026-05-30
 
 ### Added
-- **Multi-Round Iterative Debate Phase 2** (Contributed by @manavgup): Added a sophisticated multi-round debate orchestration system allowing models to debate, refine answers, and cross-pollinate their views over multiple rounds.
-- **Three Custom Critique Modes**: Added "Free-form", "Paragraph-level", and "Claim-level" debate critique formats.
-- **Canonical Claim Extraction & Verification**: Automatically extracts canonical claims using a structured JSON extractor and maps model verdicts directly over them in Stage 2.
-- **Stateful Interactive Round Selector**: Built a highly interactive `.round-navigator` in the frontend allowing users to click and navigate individual debate rounds retroactively.
-- **Stage 4: Corrected Draft**: Added a post-debate rewriting stage where the chairman synthesizes the final corrected draft, highlighting `[REVISED]` or `[NEW]` components.
-- **Debate MCP Tools Integration**: Added new `run_iterative_debate` tool and updated `council_settings` to support critique modes and debate rounds configuration.
+
+**Multi-Round Iterative Council Debate** — Contributed by **@manavgup** ([PR #11](https://github.com/jacob-bd/llm-council-plus/pull/11), building on his earlier iterative debate foundation):
+
+- **Multi-Round Debate Orchestration**: Models debate across configurable rounds (1–5), refining answers based on peer feedback with convergence detection and early stopping.
+- **Three Critique Modes**: "Free-form" (open-ended feedback), "Paragraph-level" (per-paragraph structured evaluation with stable `[Para N]` markers), and "Claim-level" (per-claim canonical extraction and verdict mapping).
+- **Canonical Claim Extraction & Verification**: Chairman model decomposes responses into falsifiable claims; peer models evaluate each claim with color-coded verdicts (strong/weak/flawed). Includes JSON extraction and repair utilities for robust LLM structured output parsing.
+- **Cross-Pollination**: Per-model personalized prompts — each model receives its own critiques plus top-rated claims from peers for adoption in subsequent rounds.
+- **ClaimCards UI**: Expandable cards grouped by source model with per-evaluator verdicts, contested-first layout, and evolution timeline.
+- **Stateful Interactive Round Selector**: `.round-navigator` in the frontend for clicking and navigating individual debate rounds retroactively.
+- **Stage 4: Corrected Draft**: Post-debate rewriting stage where the chairman synthesizes the final corrected draft, highlighting `[REVISED]` or `[NEW]` components.
+- **Debate Settings UI**: Critique mode radio buttons with cost hints, round count configuration, convergence settings, and dedicated config section.
+- **20 New Tests**: Backend test suites for paragraph mode, claim aggregation, cross-pollination, JSON repair, and multi-round debate orchestration.
+
+**Other additions:**
+
+- **Debate MCP Tools Integration**: Added new `run_iterative_debate` tool (10 MCP tools total) and updated `council_settings` to support critique modes and debate rounds configuration.
+- **Live Progress Endpoint**: `GET /api/conversations/{id}/progress` returns real-time progress for active streaming runs (council or debate), including current stage, model counts, and partial responses. Frontend auto-reconnects to in-progress runs when navigating back to a conversation.
+- **Custom Endpoint Disconnect**: Settings now includes a "Disconnect" button to clear custom OpenAI-compatible endpoint configuration and disable the provider in one action.
+
+### Changed
+- **Chairman Card UX**: Chairman card now always displays the provider logo, model name, and provider label regardless of thinking state. A spinning ring overlay and hourglass badge indicate active processing without replacing the identity information.
+- **UTC Timestamps**: Conversation `created_at` timestamps now use timezone-aware `datetime.now(timezone.utc)` instead of naive `utcnow()` with manual `"Z"` suffix.
+- **Progress Polling Safety**: Frontend stops progress polling before starting new SSE streams (council or debate) to prevent competing state updates on the same conversation.
 
 ## [0.6.1] - 2026-05-30
 

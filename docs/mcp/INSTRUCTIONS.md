@@ -12,17 +12,18 @@ The REST API skill exists as a **fallback reference**, not the default path for 
 
 ---
 
-## Tool catalog (9 tools)
+## Tool catalog (10 tools)
 
 | Tool | Actions | Replaces (legacy) |
 |------|---------|-------------------|
 | `council_deliberate` | `stage1`, `stage2`, `stage3`, `full` | `run_stage1`, `run_stage2`, `run_stage3`, `run_deliberation` |
 | `model_chat` | `quick`, `multi_turn` | `quick_chat`, `chat` |
 | `advisor_debate` | _(direct params)_ | `run_advisor_debate` |
+| `run_iterative_debate` | _(direct params: query, debate_rounds, critique_mode, etc.)_ | _(new in v0.7.0)_ |
 | `council_settings` | `get`, `update`, `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` | `get_council_config`, `configure_council` |
 | `advisor_settings` | same preset actions + `get`, `update` | `get_advisor_config`, `configure_advisors` |
 | `personas` | `list`, `get`, `update`, `reset` | `list_personas`, `get_persona`, `update_persona`, `reset_persona` |
-| `conversations` | `list`, `get` | `list_conversations`, `get_conversation` |
+| `conversations` | `list`, `get`, `progress` | `list_conversations`, `get_conversation` |
 | `providers` | `list_models`, `health`, `test`, `set_api_key`, `set_search` | `list_models`, `check_health`, `test_provider`, `set_api_key`, `set_search_provider` |
 | `config_backup` | `export`, `import`, `reset` | `export_config`, `import_config`, `reset_config` |
 
@@ -44,6 +45,8 @@ Server names vary by host: `llm-council-plus`, `llm-council`, `user-llm-council-
 | One-shot model chat | `model_chat` → `quick` |
 | Multi-turn single-model chat | `model_chat` → `multi_turn` |
 | Run advisor debate | `advisor_debate` |
+| Run multi-round council debate | `run_iterative_debate` |
+| Check active run progress | `conversations` → `progress` |
 | Manage personas | `personas` → `list` / `get` / `update` / `reset` |
 | Read advisor defaults / presets | `advisor_settings` → `get` / `list_presets` |
 | List/read conversations | `conversations` → `list` / `get` |

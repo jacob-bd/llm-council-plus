@@ -2,7 +2,7 @@
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from .config import DATA_DIR
@@ -131,7 +131,7 @@ def create_conversation(conversation_id: str, mode: str = "council") -> Dict[str
 
     conversation = {
         "id": conversation_id,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "title": "New Conversation",
         "mode": mode,
         "messages": []
@@ -219,7 +219,7 @@ def add_user_message(conversation_id: str, content: str, conversation: Optional[
 
     # If this is the very first message in a reused empty draft, reset the creation date to now
     if len(conversation["messages"]) == 0:
-        conversation["created_at"] = datetime.utcnow().isoformat()
+        conversation["created_at"] = datetime.now(timezone.utc).isoformat()
 
     conversation["messages"].append({
         "role": "user",

@@ -31,7 +31,7 @@ npm run dev
 **Ports:**
 - Backend: `http://localhost:8001` (NOT 8000 - avoid conflicts)
 - Frontend: `http://localhost:5173`
-- MCP Server (SSE): Built-in at `/mcp` on the backend (`http://localhost:8001/mcp/sse`) — **9 action-based tools** (`council_deliberate`, `model_chat`, `advisor_debate`, `council_settings`, `advisor_settings`, `personas`, `conversations`, `providers`, `config_backup`). See [`docs/mcp/TOOLS.md`](docs/mcp/TOOLS.md). `GET /api/health` reports `"mcp": {"tools": 9}`.
+- MCP Server (SSE): Built-in at `/mcp` on the backend (`http://localhost:8001/mcp/sse`) — **10 action-based tools** (`council_deliberate`, `model_chat`, `advisor_debate`, `run_iterative_debate`, `council_settings`, `advisor_settings`, `personas`, `conversations`, `providers`, `config_backup`). See [`docs/mcp/TOOLS.md`](docs/mcp/TOOLS.md). `GET /api/health` reports `"mcp": {"tools": 10}`.
 
 **Network Access:**
 ```bash
@@ -81,7 +81,7 @@ This fixes binary incompatibilities (e.g., `@rollup/rollup-darwin-*` variants).
 | `settings.py` | Config management, persisted to `data/settings.json` |
 | `config.py` | OpenRouter endpoint URL, data dir constant, settings-aware getters (`get_openrouter_api_key`, `get_council_models`, `get_chairman_model`, ...) that bridge env vars and `settings.py` |
 | `prompts.py` | Default system prompts for all stages (Stage 1/2/3, Title, Query) |
-| `main.py` | FastAPI app with streaming SSE endpoint |
+| `main.py` | FastAPI app with streaming SSE endpoints, live progress tracking (`_active_runs`), and MCP server mount |
 | `storage.py` | Conversation persistence in `data/conversations/{id}.json` |
 
 ### Frontend (`frontend/src/`)
@@ -228,6 +228,21 @@ Body: {content, models?, web_search?, execution_mode?}
 
 ### Per-Request Model Overrides
 Both `/api/conversations/{id}/message` (sync) and `/api/conversations/{id}/message/stream` (SSE) accept optional `council_models` and `chairman_model` fields that override global config for that request only. Never mutate settings for ad-hoc queries.
+
+### Live Progress (Reconnection)
+```
+GET /api/conversations/{id}/progress
+→ {active, stage, execution_mode, progress: {stage1: {count, total}, stage2: {count, total}}, stage1, stage2, stage3, stage4}
+→ {active: false} when no run is in progress
+```
+Frontend uses this to reconnect to in-progress runs when navigating back to a conversation. The progress data is held in-memory (`_active_runs` dict in `main.py`) and cleared when the streaming handler completes.
+
+### Council Debate (Multi-Round)
+```
+POST /api/conversations/{id}/message/debate
+Body: {content, execution_mode?, council_models?, chairman_model?, web_search?, debate_rounds?, critique_mode?}
+→ SSE stream (same events as /message/stream plus debate-specific events)
+```
 
 ### Minimum Model Count
 The minimum is 1 model (not 2). Single-model queries are valid for any execution mode.

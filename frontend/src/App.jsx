@@ -65,6 +65,7 @@ function App() {
   const [appMode, setAppMode] = useState(null); // null shows landing page
   const abortControllerRef = useRef(null);
   const advisorAbortControllerRef = useRef(null);
+  const progressPollRef = useRef(null);
   const requestIdRef = useRef(0);
   const isInitialMount = useRef(true);
   const conversationVersionRef = useRef(0);
@@ -210,6 +211,18 @@ function App() {
     loadConversations();
   }, []);
 
+  // Periodically refresh the conversation list so MCP/API-created conversations
+  // appear in the sidebar without requiring a page reload.
+  useEffect(() => {
+    const tick = () => { if (document.visibilityState === 'visible') loadConversations(); };
+    const interval = setInterval(tick, 30000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+
   // Auto-save execution mode preference when changed
   useEffect(() => {
     // Skip saving on initial mount
@@ -262,7 +275,7 @@ function App() {
     }
   };
 
-  // Load conversation details when selected
+  // Load conversation details when selected, then check for active runs
   useEffect(() => {
     if (currentConversationId && currentConversationId !== 'draft') {
       if (skipLoadForIdRef.current === currentConversationId) {
@@ -274,7 +287,10 @@ function App() {
       // This is StrictMode-safe: double-invocation just fires two loads,
       // both of which will be stale if a debate was started.
       const versionAtStart = conversationVersionRef.current;
-      loadConversation(currentConversationId, versionAtStart);
+      const convId = currentConversationId;
+      loadConversation(convId, versionAtStart).then(() => {
+        checkForActiveRun(convId);
+      });
     }
   }, [currentConversationId]);
 
@@ -303,7 +319,15 @@ function App() {
     }
   };
 
+  const stopProgressPolling = () => {
+    if (progressPollRef.current) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
+    }
+  };
+
   const abortAllStreams = () => {
+    stopProgressPolling();
     if (advisorAbortControllerRef.current) {
       advisorAbortControllerRef.current.abort();
       advisorAbortControllerRef.current = null;
@@ -311,6 +335,86 @@ function App() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+    }
+  };
+
+  const loadingFlagsFromStage = (stage) => ({
+    search: stage === 'search',
+    stage1: stage === 'stage1' || stage === 'initializing',
+    stage2: stage === 'stage2',
+    stage3: stage === 'stage3',
+    stage4: stage === 'stage4',
+  });
+
+  const checkForActiveRun = async (conversationId) => {
+    stopProgressPolling();
+    try {
+      const progress = await api.getConversationProgress(conversationId);
+      if (!progress.active) return;
+
+      setCurrentConversation(prev => {
+        if (!prev || prev.id !== conversationId) return prev;
+        const messages = [...prev.messages];
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg?.role === 'user') {
+          messages.push({
+            role: 'assistant',
+            stage1: progress.stage1 || null,
+            stage2: progress.stage2 || null,
+            stage3: progress.stage3 || null,
+            loading: loadingFlagsFromStage(progress.stage),
+            progress: progress.progress || {},
+            metadata: {
+              execution_mode: progress.execution_mode,
+              stage4: progress.stage4 || null,
+            },
+            externalRun: true,
+          });
+        }
+        return { ...prev, messages };
+      });
+
+      let inFlight = false;
+      progressPollRef.current = setInterval(async () => {
+        if (inFlight) return;
+        inFlight = true;
+        try {
+          const p = await api.getConversationProgress(conversationId);
+          if (!p.active) {
+            stopProgressPolling();
+            const versionAtReload = conversationVersionRef.current;
+            await loadConversation(conversationId, versionAtReload);
+            loadConversations();
+            return;
+          }
+          setCurrentConversation(prev => {
+            if (!prev || prev.id !== conversationId) return prev;
+            const messages = [...prev.messages];
+            const lastIdx = messages.length - 1;
+            if (lastIdx >= 0 && messages[lastIdx]?.externalRun) {
+              messages[lastIdx] = {
+                ...messages[lastIdx],
+                stage1: p.stage1 || messages[lastIdx].stage1,
+                stage2: p.stage2 || messages[lastIdx].stage2,
+                stage3: p.stage3 || messages[lastIdx].stage3,
+                loading: loadingFlagsFromStage(p.stage),
+                progress: p.progress || messages[lastIdx].progress,
+                metadata: {
+                  ...messages[lastIdx].metadata,
+                  stage4: p.stage4 || messages[lastIdx].metadata?.stage4,
+                }
+              };
+            }
+            return { ...prev, messages };
+          });
+        } catch {
+          // Poll errors are expected during network blips
+        } finally {
+          inFlight = false;
+        }
+      }, 3000);
+    } catch {
+      // Progress endpoint unavailable — no-op
     }
   };
 
@@ -330,6 +434,8 @@ function App() {
   };
 
   const handleSelectConversation = (id) => {
+    abortAllStreams();
+    setIsLoading(false);
     setCurrentConversationId(id);
     // Auto-switch mode based on conversation mode
     const conv = conversations.find(c => c.id === id);
@@ -365,7 +471,7 @@ function App() {
   };
 
   const handleStartDebate = async (options) => {
-    // Assign unique ID to this request to prevent race conditions
+    stopProgressPolling();
     const currentRequestId = ++requestIdRef.current;
 
     setIsLoading(true);
@@ -586,7 +692,7 @@ function App() {
   const handleSendMessage = async (content, searchProvider) => {
     if (!currentConversationId) return;
 
-    // Assign unique ID to this request to prevent race conditions
+    stopProgressPolling();
     const currentRequestId = ++requestIdRef.current;
 
     // Create new AbortController for this request
@@ -744,7 +850,6 @@ function App() {
               break;
 
             case 'stage1_init':
-              console.log('DEBUG: Received stage1_init', event);
               setCurrentConversation((prev) => {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];

@@ -69,7 +69,8 @@ export default function ProviderSettings({
     handleTestCustomEndpoint,
     isTestingCustomEndpoint,
     customEndpointTestResult,
-    customEndpointModels
+    customEndpointModels,
+    onClearCustomEndpoint
 }) {
     const getDirectProviderModelsCount = (providerId) => {
         const providerNameMap = {
@@ -345,11 +346,19 @@ export default function ProviderSettings({
                         </button>
                     </div>
 
-                    {/* Show configured status when endpoint is saved */}
+                    {/* Show configured status and disconnect button when endpoint is saved */}
                     {settings?.custom_endpoint_url && (
-                        <div className="key-status set">
-                            ✓ Endpoint configured
-                            {customEndpointModels.length > 0 && ` · ${customEndpointModels.length} models available`}
+                        <div className="key-status set key-status-row">
+                            <span>
+                                ✓ Endpoint configured
+                                {customEndpointModels.length > 0 && ` · ${customEndpointModels.length} models available`}
+                            </span>
+                            <button
+                                className="test-button danger"
+                                onClick={onClearCustomEndpoint}
+                            >
+                                Disconnect
+                            </button>
                         </div>
                     )}
                     {customEndpointTestResult && (

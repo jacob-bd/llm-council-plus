@@ -43,6 +43,7 @@ Use MCP when your tool list includes any of these **10 tools** (server may appea
 | One-shot model chat | `model_chat` | `quick` | ~~`POST /api/ask`~~ |
 | Multi-turn chat with a model | `model_chat` | `multi_turn` | ~~conversation message endpoints~~ |
 | List / read conversations | `conversations` | `list`, `get` | ~~conversation GETs~~ |
+| Check active run progress | `conversations` | `progress` | ~~`GET /api/conversations/{id}/progress`~~ |
 | List / read / edit personas | `personas` | `list`, `get`, `update`, `reset` | ~~`/api/personas`~~ |
 | Read advisor defaults (+ presets) | `advisor_settings` | `get` | ~~`GET /api/settings`~~ (advisor fields) |
 | Update advisor defaults | `advisor_settings` | `update` | ~~`PUT /api/settings`~~ (advisor fields) |
@@ -63,7 +64,7 @@ Use MCP when your tool list includes any of these **10 tools** (server may appea
 | `council_settings` | `get`, `update` (members/chairman/temps/mode/prompts/provider toggles/**debate config**), `list_presets`, `save_preset`, `delete_preset`, `set_default_preset` |
 | `advisor_settings` | Same preset actions + `get`, `update` |
 | `personas` | `list`, `get`, `update`, `reset` |
-| `conversations` | `list`, `get` |
+| `conversations` | `list`, `get`, `progress` |
 | `providers` | `list_models`, `health`, `test`, `set_api_key`, `set_search` |
 | `config_backup` | `export`, `import`, `reset` |
 
@@ -102,8 +103,10 @@ Use this table **only when MCP tools are unavailable** or the operation has no M
 | List conversations | GET | `/api/conversations` |
 | Create conversation | POST | `/api/conversations` |
 | Get conversation | GET | `/api/conversations/{id}` |
+| **Get live run progress** | **GET** | **`/api/conversations/{id}/progress`** |
 | Send message (sync JSON) | POST | `/api/conversations/{id}/message` |
 | Send message (SSE stream) | POST | `/api/conversations/{id}/message/stream` |
+| **Run council debate (SSE stream)** | **POST** | **`/api/conversations/{id}/message/debate`** |
 | **Run advisor debate (SSE stream)** | **POST** | **`/api/conversations/{id}/debate/stream`** |
 | List all personas | GET | `/api/personas` |
 | Update a persona | PATCH | `/api/personas/{id}` |
@@ -135,12 +138,15 @@ groq:llama3-70b-8192                   → Groq fast inference
 | Multi-turn conversation with follow-ups | `POST /api/conversations/{id}/message` | Models see full prior context. JSON response. |
 | Multi-turn with live SSE progress | `POST /api/conversations/{id}/message/stream` | Real-time stage updates + multi-turn context. |
 | **Persona-driven debate** | **`POST /api/conversations/{id}/debate/stream`** | Named advisors argue across rounds; returns verdict. |
+| **Multi-round council debate** | **`POST /api/conversations/{id}/message/debate`** | Iterative debate with critique modes; streams council debate rounds. |
+| **Monitor an active run** | **`GET /api/conversations/{id}/progress`** | Poll partial results of a run started by another client. |
 
 **Key principles:**
 - Never mutate global config for ad-hoc queries. Use per-request `models` / `council_models` / `chairman_model` overrides instead.
 - Use conversation endpoints when you need follow-up questions — models automatically receive prior turns as context.
 - `/api/ask` is stateless — no memory between calls.
 - Advisor debates always require a conversation — create one first, then stream the debate to it.
+- Use `GET /api/conversations/{id}/progress` to check on an active run started by another client (MCP, UI, or another script) — returns `{active: false}` when no run is in progress.
 
 ---
 
@@ -549,6 +555,62 @@ async def get_conversation(conv_id, base_url="http://localhost:8001"):
                 print("A (chairman):", s3.get("response", "")[:500])
     return conv
 ```
+
+---
+
+### 13b. Check Live Progress of an Active Run
+
+Poll this endpoint to observe an in-progress council deliberation or multi-round debate from another client. Returns partial stage results as they stream.
+
+```bash
+curl http://localhost:8001/api/conversations/$CONV_ID/progress | python3 -m json.tool
+```
+
+**Response when a run is active:**
+```json
+{
+  "active": true,
+  "stage": "stage1",
+  "execution_mode": "full",
+  "progress": {
+    "stage1": {"count": 2, "total": 4},
+    "stage2": {"count": 0, "total": 0}
+  },
+  "stage1": [
+    {"model": "openai:gpt-4.1", "response": "...", "error": null},
+    {"model": "anthropic:claude-sonnet-4", "response": "...", "error": null}
+  ],
+  "stage2": null,
+  "stage3": null,
+  "stage4": null
+}
+```
+
+**Response when no run is active:**
+```json
+{"active": false}
+```
+
+```python
+import asyncio, httpx
+
+async def poll_progress(conv_id: str, base_url="http://localhost:8001"):
+    async with httpx.AsyncClient() as client:
+        while True:
+            r = await client.get(f"{base_url}/api/conversations/{conv_id}/progress")
+            data = r.json()
+            if not data.get("active"):
+                print("Run complete or no active run.")
+                break
+            s1 = data["progress"]["stage1"]
+            print(f"Stage: {data['stage']} — {s1['count']}/{s1['total']} models done")
+            await asyncio.sleep(2)
+```
+
+**Use cases:**
+- Frontend auto-reconnects to in-progress runs when navigating back to a conversation
+- MCP agents or scripts can monitor a deliberation started elsewhere
+- Dashboard / status views that show active council activity
 
 ---
 

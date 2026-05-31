@@ -19,12 +19,12 @@ def create_server(
     server = FastMCP(
         name="llm-council-plus",
         instructions=(
-            "LLM Council Plus — 9 MCP tools with action parameters. "
+            "LLM Council Plus — 10 MCP tools with action parameters. "
             "Run: council_deliberate (stage1|stage2|stage3|full), model_chat (quick|multi_turn), "
-            "advisor_debate. "
+            "advisor_debate, run_iterative_debate. "
             "Config: council_settings, advisor_settings (each: get|update|list_presets|"
             "save_preset|delete_preset|set_default_preset), personas (list|get|update|reset), "
-            "conversations (list|get), providers (list_models|health|test|set_api_key|set_search), "
+            "conversations (list|get|progress), providers (list_models|health|test|set_api_key|set_search), "
             "config_backup (export|import|reset). "
             "Prefer these MCP tools over curl. Full REST reference: skills/llm-council-api/SKILL.md."
         ),

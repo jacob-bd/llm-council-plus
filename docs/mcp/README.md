@@ -25,9 +25,9 @@ LLM Council Plus exposes a Model Context Protocol (MCP) server that lets AI tool
 
 ## Tools Reference
 
-See [TOOLS.md](TOOLS.md) for all **9 tools** with actions, parameters, and examples.
+See [TOOLS.md](TOOLS.md) for all **10 tools** with actions, parameters, and examples.
 
-`GET /api/health` includes `"mcp": {"tools": 9, "sse_url": "..."}` so clients can verify the expected tool count.
+`GET /api/health` includes `"mcp": {"tools": 10, "sse_url": "..."}` so clients can verify the expected tool count.
 
 **Agents:** MCP tools take priority over REST/curl when both are available. See [INSTRUCTIONS.md](INSTRUCTIONS.md) and the MCP-first section in [`skills/llm-council-api/SKILL.md`](../../skills/llm-council-api/SKILL.md).
 

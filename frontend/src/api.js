@@ -100,6 +100,20 @@ export const api = {
   },
 
   /**
+   * Get live progress for an active streaming run (council or debate).
+   * Returns {active: false} when no run is active for this conversation.
+   */
+  async getConversationProgress(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/progress`
+    );
+    if (!response.ok) {
+      throw new Error('Failed to get conversation progress');
+    }
+    return response.json();
+  },
+
+  /**
    * Delete a conversation.
    */
   async deleteConversation(conversationId) {

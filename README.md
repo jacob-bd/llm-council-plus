@@ -310,12 +310,12 @@ Connect to any OpenAI-compatible API:
 
 LLM Council Plus exposes a powerful Model Context Protocol (MCP) server that lets AI tools like Claude Code and Gemini CLI interact directly with your local or remote instance.
 
-The server exposes **9 action-based tools** grouped by domain:
-1. **Deliberation**: `council_deliberate` (stage1/stage2/stage3/full), `model_chat` (quick/multi_turn), `advisor_debate`
+The server exposes **10 action-based tools** grouped by domain:
+1. **Deliberation**: `council_deliberate` (stage1/stage2/stage3/full), `model_chat` (quick/multi_turn), `advisor_debate`, `run_iterative_debate`
 2. **Configuration**: `council_settings`, `advisor_settings`, `personas`, `providers`, `config_backup`
 3. **History**: `conversations` (list/get)
 
-Legacy 25-tool names were removed in v0.5.2 — see [docs/mcp/TOOLS.md](docs/mcp/TOOLS.md) for the action parameter on each tool.
+Legacy 25-tool names were removed in v0.5.2. `run_iterative_debate` was added in v0.7.0. See [docs/mcp/TOOLS.md](docs/mcp/TOOLS.md) for the action parameter on each tool.
 
 **Quick registration for Claude Code:**
 
@@ -330,7 +330,7 @@ Legacy 25-tool names were removed in v0.5.2 — see [docs/mcp/TOOLS.md](docs/mcp
   claude mcp add llm-council --url http://yourserver.com:8001/mcp/sse
   ```
 
-Then ask Claude: "check the council health" to verify the connection (`providers` → action `health`; expect 9 tools in `/api/health`).
+Then ask Claude: "check the council health" to verify the connection (`providers` → action `health`; expect 10 tools in `/api/health`).
 
 See **[docs/mcp/](docs/mcp/)** for full setup guides, including stdio/SSE transport configurations, complete tools reference, and usage examples.
 

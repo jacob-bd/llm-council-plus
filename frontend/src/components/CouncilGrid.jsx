@@ -120,29 +120,33 @@ export default function CouncilGrid({
             {showChairman && (
                 <div
                     className={`council-card chairman ${status === 'thinking' ? 'waiting' : 'ready'} ${chairmanDisabled ? 'chairman-disabled' : ''}`}
-                    style={{ '--provider-color': (status !== 'thinking' && chairman && !chairmanDisabled) ? getProviderInfo(chairman).color : '#94a3b8' }}
+                    style={{ '--provider-color': (chairman && !chairmanDisabled) ? getProviderInfo(chairman).color : '#94a3b8' }}
                     onMouseEnter={(e) => status !== 'thinking' && !chairmanDisabled && handleMouseEnter(e, chairman || 'Chairman')}
                     onMouseMove={handleMouseMove}
                     onMouseLeave={handleMouseLeave}
                 >
                     <div className="role-badge chairman">Chairman</div>
                     <div className="council-avatar">
-                        {status !== 'thinking' && chairmanInfo && chairmanInfo.logo && !chairmanDisabled ? (
+                        {chairmanInfo && chairmanInfo.logo && !chairmanDisabled ? (
                             <img
                                 src={chairmanInfo.logo}
                                 alt={chairmanInfo.label}
                                 className="provider-logo"
                             />
                         ) : (
-                            <span className="avatar-icon">{status === 'thinking' ? '⏳' : (chairmanDisabled ? '⚖️' : (chairmanInfo ? chairmanInfo.icon : '⚖️'))}</span>
+                            <span className="avatar-icon">{chairmanDisabled ? '⚖️' : (chairmanInfo ? chairmanInfo.icon : '⚖️')}</span>
+                        )}
+                        {status === 'thinking' && <div className="thinking-ring"></div>}
+                        {status === 'thinking' && (
+                            <div className="working-badge" title="Verdict pending...">⏳</div>
                         )}
                     </div>
                     <div className="council-info">
                         <span className="model-name">
-                            {status === 'thinking' ? 'Verdict Pending' : chairmanDisabled ? 'Not Active' : (chairman ? getModelDisplayName(chairman) : 'Model')}
+                            {chairmanDisabled ? 'Not Active' : (chairman ? getModelDisplayName(chairman) : 'Model')}
                         </span>
                         <span className="provider-label">
-                            {status === 'thinking' ? 'Waiting...' : chairmanDisabled ? 'Full Deliberation only' : 'Final Verdict'}
+                            {status === 'thinking' ? 'Verdict Pending...' : chairmanDisabled ? 'Full Deliberation only' : 'Final Verdict'}
                         </span>
                     </div>
                 </div>
