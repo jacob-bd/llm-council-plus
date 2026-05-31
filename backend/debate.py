@@ -118,6 +118,14 @@ async def extract_canonical_claims(
     if not isinstance(result, dict):
         logger.warning("Claim extraction returned non-dict (%s), falling back to free-form", type(result).__name__)
         return None
+
+    # Normalize keys (strip whitespace, newlines, and outer quotes) to prevent KeyErrors on lookups
+    normalized_result = {}
+    for key, val in result.items():
+        clean_key = str(key).strip().strip('"').strip("'").strip()
+        normalized_result[clean_key] = val
+    result = normalized_result
+
     # Verify values are lists of dicts with 'id' and 'claim' keys
     for key, claims in result.items():
         if not isinstance(claims, list):
