@@ -133,15 +133,15 @@ CLAIM_EXTRACTION_PROMPT = """Decompose each response into individual claims (spe
 
 Respond with ONLY valid JSON (no other text):
 ```json
-{
+{{
   "Response A": [
-    {"id": "A1", "claim": "specific falsifiable statement"},
-    {"id": "A2", "claim": "another statement"}
+    {{"id": "A1", "claim": "specific falsifiable statement"}},
+    {{"id": "A2", "claim": "another statement"}}
   ],
   "Response B": [
-    {"id": "B1", "claim": "statement"}
+    {{"id": "B1", "claim": "statement"}}
   ]
-}
+}}
 ```"""
 
 STAGE2_PARAGRAPH_PROMPT = """You are evaluating responses to: {user_query}
@@ -155,8 +155,8 @@ Respond with valid JSON followed by your ranking:
 
 ```json
 [
-  {"response": "Response A", "paragraph": 1, "verdict": "strong", "comment": "reason"},
-  {"response": "Response A", "paragraph": 2, "verdict": "flawed", "comment": "reason"}
+  {{"response": "Response A", "paragraph": 1, "verdict": "strong", "comment": "reason"}},
+  {{"response": "Response A", "paragraph": 2, "verdict": "flawed", "comment": "reason"}}
 ]
 ```
 
@@ -175,10 +175,10 @@ These canonical claims have been extracted. Rate each one:
 Respond with valid JSON followed by your ranking:
 
 ```json
-{
-  "A1": {"verdict": "strong", "reason": "one sentence"},
-  "A2": {"verdict": "flawed", "reason": "one sentence"}
-}
+{{
+  "A1": {{"verdict": "strong", "reason": "one sentence"}},
+  "A2": {{"verdict": "flawed", "reason": "one sentence"}}
+}}
 ```
 
 FINAL RANKING:
