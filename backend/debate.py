@@ -237,8 +237,13 @@ def _format_own_paragraphs(
     para_comments: Dict[int, List[str]] = {}
     for result in stage2_results:
         annotations = result.get("annotations", [])
+        if not isinstance(annotations, list):
+            continue
         for ann in annotations:
-            if ann.get("response") == label:
+            if not isinstance(ann, dict):
+                continue
+            ann_response = ann.get("response")
+            if ann_response == label:
                 pn = ann.get("paragraph", 0)
                 para_verdicts.setdefault(pn, []).append(ann.get("verdict", ""))
                 if ann.get("comment"):
@@ -272,8 +277,14 @@ def _select_top_paragraphs_from_others(
     from collections import Counter
     para_scores: Dict[tuple, list] = {}
     for result in stage2_results:
-        for ann in result.get("annotations", []):
-            key = (ann.get("response", ""), ann.get("paragraph", 0))
+        annotations = result.get("annotations", [])
+        if not isinstance(annotations, list):
+            continue
+        for ann in annotations:
+            if not isinstance(ann, dict):
+                continue
+            ann_response = ann.get("response", "")
+            key = (ann_response, ann.get("paragraph", 0))
             para_scores.setdefault(key, []).append(ann.get("verdict", ""))
 
     # Find strong paragraphs from other models
@@ -282,7 +293,7 @@ def _select_top_paragraphs_from_others(
         if label == target_label:
             continue
         c = Counter(verdicts)
-        if c.most_common(1)[0][0] == "strong":
+        if c and c.most_common(1)[0][0] == "strong":
             agreement = c["strong"] / len(verdicts)
             # Find the actual paragraph text
             model_name = label_to_model.get(label)
